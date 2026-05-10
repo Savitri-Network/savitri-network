@@ -21,8 +21,14 @@ Thumbs.db
 *.key
 !**/keys/README*
 
-# Genesis generator output (contains private keys — never commit)
+# Genesis generator output (contains private keys — never commit).
+# `genesis_testnet.json` is excluded when produced in the working
+# directory by `generate_testnet_genesis`, but the *bundled template*
+# under `savitri-core/src/core/genesis/` only contains dummy 0x000…001
+# addresses and is part of the source — exempt it explicitly so
+# `include_str!` resolves at build time.
 genesis_testnet.json
+!savitri-core/src/core/genesis/genesis_testnet.json
 private_keys_testnet.md
 faucet_keys_testnet.json
 

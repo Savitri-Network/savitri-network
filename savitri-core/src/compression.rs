@@ -73,7 +73,7 @@ pub fn decompress(compressed_data: &[u8], algorithm: CompressionAlgorithm) -> Re
 /// Compress data using Snappy algorithm
 #[cfg(feature = "snap")]
 fn compress_snappy(data: &[u8]) -> Result<Vec<u8>> {
-    let encoder = snap::raw::Encoder::new();
+    let mut encoder = snap::raw::Encoder::new();
     encoder
         .compress_vec(data)
         .map_err(|e| anyhow::anyhow!("Snappy compression failed: {}", e))
@@ -82,7 +82,7 @@ fn compress_snappy(data: &[u8]) -> Result<Vec<u8>> {
 /// Decompress data using Snappy algorithm
 #[cfg(feature = "snap")]
 fn decompress_snappy(compressed_data: &[u8]) -> Result<Vec<u8>> {
-    let decoder = snap::raw::Decoder::new();
+    let mut decoder = snap::raw::Decoder::new();
     decoder
         .decompress_vec(compressed_data)
         .map_err(|e| anyhow::anyhow!("Snappy decompression failed: {}", e))
@@ -92,7 +92,7 @@ fn decompress_snappy(compressed_data: &[u8]) -> Result<Vec<u8>> {
 #[cfg(feature = "zstd")]
 fn compress_zstd(data: &[u8], level: Option<u8>) -> Result<Vec<u8>> {
     use zstd::encode_all;
-    let level = level.unwrap_or(3);
+    let level: i32 = level.unwrap_or(3).into();
     encode_all(data, level).map_err(|e| anyhow::anyhow!("Zstd compression failed: {}", e))
 }
 
@@ -105,9 +105,12 @@ fn decompress_zstd(compressed_data: &[u8]) -> Result<Vec<u8>> {
 
 /// Compress data using LZ4 algorithm
 #[cfg(feature = "lz4")]
-fn compress_lz4(data: &[u8], level: Option<u8>) -> Result<Vec<u8>> {
-    let level = level.unwrap_or(1);
-    lz4::block::compress(data).map_err(|e| anyhow::anyhow!("LZ4 compression failed: {}", e))
+fn compress_lz4(data: &[u8], _level: Option<u8>) -> Result<Vec<u8>> {
+    // `lz4 1.28` requires `(src, mode, prepend_size)`; we pass the default
+    // mode and `prepend_size=true` so `decompress` can recover the original
+    // length without an external hint.
+    lz4::block::compress(data, None, true)
+        .map_err(|e| anyhow::anyhow!("LZ4 compression failed: {}", e))
 }
 
 /// Decompress data using LZ4 algorithm

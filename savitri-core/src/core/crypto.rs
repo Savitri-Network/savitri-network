@@ -256,32 +256,34 @@ pub fn validate_identity_keypair(kp: &IdentityKeypair) -> Result<(), String> {
 pub fn identity_to_libp2p_keypair(
     identity: IdentityKeypair,
 ) -> anyhow::Result<libp2p::identity::Keypair> {
-    use libp2p::identity::ed25519::Keypair as Ed25519Keypair;
     use libp2p::identity::Keypair;
 
-    // Convert our signing key to libp2p format
-    let ed25519_keypair = Ed25519Keypair::from(identity.signing_key());
-    let libp2p_keypair = Keypair::Ed25519(ed25519_keypair);
-
-    Ok(libp2p_keypair)
+    // libp2p 0.55+ removed the `Keypair::Ed25519(...)` constructor. The
+    // canonical entry point is `Keypair::ed25519_from_bytes`, which takes
+    // ownership of the 32-byte secret and zeroises the buffer once used.
+    let mut secret_bytes = identity.signing_key().to_bytes();
+    Keypair::ed25519_from_bytes(&mut secret_bytes)
+        .map_err(|e| anyhow::anyhow!("libp2p ed25519_from_bytes: {}", e))
 }
 
-/// Convert libp2p keypair to identity (when libp2p is available)
-/// This function provides libp2p integration when the dependency is available
+/// Convert libp2p keypair to identity (when libp2p is available).
+/// This function provides libp2p integration when the dependency is available.
 #[cfg(feature = "libp2p")]
 pub fn libp2p_keypair_to_identity(keypair: libp2p::identity::Keypair) -> IdentityKeypair {
-    use libp2p::identity::ed25519::Keypair as Ed25519Keypair;
-    use libp2p::identity::Keypair;
-
-    match keypair {
-        Keypair::Ed25519(ed25519_keypair) => {
-            let signing_key = ed25519_keypair.into();
+    // libp2p 0.55+ replaced `match Keypair { Ed25519(..) }` with the
+    // fallible accessor `try_into_ed25519`. Non-Ed25519 variants fall back
+    // to a fresh local identity, matching the prior behaviour.
+    match keypair.try_into_ed25519() {
+        Ok(ed25519_keypair) => {
+            let secret_slice: &[u8] = ed25519_keypair.secret().as_ref();
+            // Invariant: ed25519 SecretKey is always 32 bytes.
+            let secret_bytes: [u8; 32] = secret_slice
+                .try_into()
+                .expect("invariant: ed25519 secret key is 32 bytes");
+            let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_bytes);
             IdentityKeypair::from_signing_key(signing_key)
         }
-        _ => {
-            // For other keypair types, generate a new identity
-            IdentityKeypair::new()
-        }
+        Err(_) => IdentityKeypair::new(),
     }
 }
 
