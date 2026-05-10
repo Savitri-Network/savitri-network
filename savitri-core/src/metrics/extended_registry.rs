@@ -1,13 +1,12 @@
-//! Extended Metrics Provider - 200+ Metriche per Savitri Network
+//! Extended metrics provider — 200+ metrics for Savitri Network
+//! with minimal runtime overhead (target: <1% CPU).
 //!
-//! e overhead minimo (<1% CPU).
-//!
-//! Caratteristiche:
-//! - 200+ metriche suddivise per categoria
-//! - Labels per moltiplicare i punti dati
-//! - Caching hardware metrics per performance
-//! - Thread-safe con atomic operations
-//! - Prometheus format con labels dinamici
+//! Highlights:
+//! - 200+ metrics grouped by domain (consensus, mempool, network, …)
+//! - Labels to multiply data points along orthogonal axes
+//! - Hardware metrics cached to avoid syscall storms
+//! - Thread-safe via atomic operations
+//! - Prometheus exposition format with dynamic labels
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,207 +18,207 @@ use prometheus::{Counter, Gauge, Histogram, Registry, Opts, HistogramOpts};
 use sysinfo::{System, SystemExt, ProcessExt, CpuExt, DiskExt, NetworkExt};
 
 pub struct SavitriMetricsRegistry {
-    /// Registry Prometheus
+    /// Underlying Prometheus registry
     registry: Registry,
-    /// Metriche Blockchain & Consensus
+    /// Blockchain & consensus metrics
     blockchain: BlockchainMetrics,
-    /// Metriche Mempool
+    /// Mempool metrics
     mempool: MempoolMetrics,
-    /// Metriche Network & P2P
+    /// Network & P2P metrics
     network: NetworkMetrics,
-    /// Metriche Execution & DAG
+    /// Execution & DAG metrics
     execution: ExecutionMetrics,
-    /// Metriche System & Storage
+    /// System & storage metrics
     system: SystemMetrics,
-    /// Metriche Security
+    /// Security metrics
     security: SecurityMetrics,
-    /// Metriche Tokenomics
+    /// Tokenomics metrics
     tokenomics: TokenomicsMetrics,
-    /// Cache per metriche hardware
+    /// Cached hardware metrics (refreshed periodically)
     hardware_cache: Arc<RwLock<HardwareMetricsCache>>,
 }
 
-/// Metriche Blockchain & Consensus (Critical)
+/// Blockchain & consensus metrics (criticality: critical).
 pub struct BlockchainMetrics {
-    /// Altezza blockchain corrente
+    /// Current chain height
     block_height: Gauge,
-    /// Tempo di finalità in secondi
+    /// Time to finality, in seconds
     finality_time_seconds: Histogram,
-    /// Round di consenso completati
+    /// Consensus rounds completed
     consensus_rounds_total: Counter,
     active_validators: Gauge,
-    /// Fork temporanei rilevati
+    /// Temporary forks observed
     temporary_forks_total: Counter,
-    /// Tempo blocco in secondi
+    /// Block time, in seconds
     block_time_seconds: Histogram,
-    /// Proposte di blocco
+    /// Block proposals issued
     block_proposals_total: Counter,
-    /// Voti ricevuti
+    /// Votes received
     votes_received_total: Counter,
-    /// Certificati generati
+    /// Certificates generated
     certificates_generated_total: Counter,
-    /// Score di byzantine behavior
+    /// Aggregate Byzantine-behaviour score
     byzantine_behavior_score: Gauge,
 }
 
-/// Metriche Mempool (High)
+/// Mempool metrics (criticality: high).
 pub struct MempoolMetrics {
-    /// Dimensione mempool (numero transazioni)
+    /// Mempool size (number of transactions)
     size: Gauge,
-    /// Dimensione mempool in bytes
+    /// Mempool size in bytes
     size_bytes: Gauge,
-    /// Tasso ammissione transazioni
+    /// Transaction admission rate
     admission_rate: Gauge,
-    /// Tasso rigetto transazioni
+    /// Transaction rejection rate
     rejection_rate: Gauge,
     /// Mean queue residency time
     avg_queue_time_seconds: Gauge,
-    /// Tasso evict mempool
+    /// Mempool eviction rate
     eviction_rate: Gauge,
-    /// Transazioni aggiunte totali
+    /// Total transactions admitted
     transactions_added_total: Counter,
-    /// Transazioni rimosse totali
+    /// Total transactions removed
     transactions_removed_total: Counter,
-    /// Transazioni scadute totali
+    /// Total transactions expired (TTL)
     transactions_expired_total: Counter,
-    /// Transazioni duplicate rifiutate
+    /// Total duplicates rejected at admission
     duplicate_rejections_total: Counter,
-    /// Distribuzione fee transazioni
+    /// Distribution of transaction fees
     fee_distribution: Histogram,
 }
 
-/// Metriche Network & P2P (High)
+/// Network & P2P metrics (criticality: high).
 pub struct NetworkMetrics {
-    /// Numero peer connessi
+    /// Number of connected peers
     connected_peers: Gauge,
-    /// Latenza peer in millisecondi
+    /// Peer latency, in milliseconds
     peer_latency_ms: Histogram,
-    /// Tempo propagazione messaggi Gossip
+    /// GossipSub propagation time
     gossip_propagation_time_ms: Histogram,
-    /// Banda utilizzata protocollo
+    /// Protocol bandwidth in use
     protocol_bandwidth_bytes_per_sec: Gauge,
-    /// Errori connessione
+    /// Connection errors
     connection_errors_total: Counter,
-    /// Tasso discovery peer
+    /// Peer-discovery rate
     discovery_rate: Gauge,
-    /// Messaggi Gossip inviati
+    /// GossipSub messages sent
     gossip_messages_sent_total: Counter,
-    /// Messaggi Gossip ricevuti
+    /// GossipSub messages received
     gossip_messages_received_total: Counter,
-    /// Bytes inviati via P2P
+    /// Bytes sent over P2P
     p2p_bytes_sent_total: Counter,
-    /// Bytes ricevuti via P2P
+    /// Bytes received over P2P
     p2p_bytes_received_total: Counter,
-    /// Handshake completati
+    /// Handshakes completed
     handshakes_completed_total: Counter,
-    /// Handshake falliti
+    /// Handshakes failed
     handshakes_failed_total: Counter,
 }
 
-/// Metriche Execution & DAG (High)
+/// Execution & DAG metrics (criticality: high).
 pub struct ExecutionMetrics {
-    /// Tempo esecuzione transazioni
+    /// Transaction execution time
     tx_execution_time_ms: Histogram,
-    /// Gas consumato
+    /// Gas consumed
     gas_used: Histogram,
-    /// Deployment smart contract
+    /// Smart-contract deployments
     contract_deployments_total: Counter,
-    /// Chiamate smart contract
+    /// Smart-contract calls
     contract_calls_total: Counter,
-    /// Profondità dipendenze DAG
+    /// DAG dependency depth
     dag_dependency_depth: Histogram,
-    /// Concorrenza esecuzione
+    /// Execution concurrency
     execution_concurrency: Gauge,
-    /// Transazioni eseguite al secondo
+    /// Transactions executed per second
     transactions_per_second: Gauge,
-    /// Errori esecuzione
+    /// Execution errors
     execution_errors_total: Counter,
-    /// Throughput DAG
+    /// DAG throughput
     dag_throughput_ops_per_sec: Gauge,
 }
 
-/// Metriche System & Storage (Medium)
+/// System & storage metrics (criticality: medium).
 pub struct SystemMetrics {
-    /// IOPS disco read
+    /// Disk read IOPS
     disk_read_iops: Gauge,
-    /// IOPS disco write
+    /// Disk write IOPS
     disk_write_iops: Gauge,
-    /// Latenza storage read
+    /// Storage read latency
     storage_read_latency_ms: Histogram,
-    /// Latenza storage write
+    /// Storage write latency
     storage_write_latency_ms: Histogram,
-    /// Utilizzo CPU percentuale
+    /// CPU usage in percent
     cpu_usage_percent: Gauge,
-    /// Utilizzo memoria in MB
+    /// Memory usage in MB
     memory_usage_mb: Gauge,
-    /// Thread attivi
+    /// Active threads
     active_threads: Gauge,
-    /// Descrittori file utilizzati
+    /// File descriptors in use
     file_descriptors_used: Gauge,
-    /// Load average sistema
+    /// System load average
     system_load_average: Gauge,
-    /// Swap utilizzata in MB
+    /// Swap usage in MB
     swap_usage_mb: Gauge,
-    /// Network I/O bytes per secondo
+    /// Network I/O bytes per second
     network_io_bytes_per_sec: Gauge,
 }
 
-/// Metriche Security (Critical)
+/// Security metrics (criticality: critical).
 pub struct SecurityMetrics {
-    /// Tentativi autenticazione falliti
+    /// Failed authentication attempts
     failed_auth_attempts_total: Counter,
-    /// Connessioni sospette
+    /// Suspicious connections
     suspicious_connections_total: Counter,
-    /// Spam rilevato
+    /// Spam detected
     spam_detected_total: Counter,
-    /// Score byzantine behavior
+    /// Byzantine-behaviour score
     byzantine_behavior_score: Gauge,
-    /// Firme invalide
+    /// Invalid signatures
     invalid_signatures_total: Counter,
-    /// Certificati revocati
+    /// Revoked certificates
     revoked_certificates_total: Counter,
-    /// Rate limiting attivi
+    /// Active rate-limiters
     rate_limiting_active: Gauge,
     /// Firewall blocks
     firewall_blocks_total: Counter,
-    /// Security alerts generati
+    /// Security alerts emitted
     security_alerts_total: Counter,
 }
 
-/// Metriche Tokenomics (Medium)
+/// Tokenomics metrics (criticality: medium).
 pub struct TokenomicsMetrics {
-    /// Supply dinamica
+    /// Dynamic supply
     dynamic_supply: Gauge,
-    /// Burn rate token
+    /// Token burn rate
     burn_rate_per_hour: Gauge,
-    /// Fee accumulate
+    /// Accumulated fees
     accumulated_fees: Gauge,
     /// Staking ratio
     staking_ratio: Gauge,
-    /// Token in circolazione
+    /// Circulating supply
     circulating_supply: Gauge,
-    /// Token bruciati
+    /// Burned tokens
     burned_tokens: Gauge,
-    /// Token bloccati
+    /// Locked tokens
     locked_tokens: Gauge,
-    /// Inflazione annuale
+    /// Annual inflation rate
     annual_inflation_rate: Gauge,
     /// Market cap
     market_cap: Gauge,
 }
 
-/// Cache per metriche hardware
+/// Cached hardware metrics, refreshed at a fixed interval.
 #[derive(Debug, Clone)]
 pub struct HardwareMetricsCache {
     last_update: Instant,
     update_interval: Duration,
-    /// Metriche CPU cached
+    /// Cached CPU usage
     cpu_usage: f64,
-    /// Metriche memoria cached
+    /// Cached memory usage
     memory_usage: u64,
-    /// Metriche disco cached
+    /// Cached disk usage
     disk_usage: u64,
-    /// Metriche network cached
+    /// Cached network I/O (rx, tx)
     network_io: (u64, u64),
 }
 
@@ -227,7 +226,7 @@ impl Default for HardwareMetricsCache {
     fn default() -> Self {
         Self {
             last_update: Instant::now(),
-            update_interval: Duration::from_secs(5), // Updates ogni 5 secondi
+            update_interval: Duration::from_secs(5), // Refresh every 5 seconds
             cpu_usage: 0.0,
             memory_usage: 0,
             disk_usage: 0,
@@ -293,7 +292,7 @@ impl SavitriMetricsRegistry {
         Ok(())
     }
 
-    /// Legge CPU usage reale
+    /// Read live CPU usage
     async fn read_cpu_usage(&self) -> Result<f64, Box<dyn std::error::Error>> {
         let mut system = System::new();
         system.refresh_cpu();
@@ -305,7 +304,7 @@ impl SavitriMetricsRegistry {
         Ok(cpu_usage)
     }
 
-    /// Legge memoria usage reale
+    /// Read live memory usage
     async fn read_memory_usage(&self) -> Result<u64, Box<dyn std::error::Error>> {
         let mut system = System::new();
         system.refresh_memory();
@@ -317,7 +316,7 @@ impl SavitriMetricsRegistry {
         Ok(memory_usage)
     }
 
-    /// Legge disco usage reale
+    /// Read live disk usage
     async fn read_disk_usage(&self) -> Result<u64, Box<dyn std::error::Error>> {
         let mut system = System::new();
         system.refresh_disks();
@@ -332,7 +331,7 @@ impl SavitriMetricsRegistry {
         Ok(total_disk_usage)
     }
 
-    /// Legge network I/O reale
+    /// Read live network I/O
     async fn read_network_io(&self) -> Result<(u64, u64), Box<dyn std::error::Error>> {
         let mut system = System::new();
         system.refresh_networks();
@@ -350,7 +349,7 @@ impl SavitriMetricsRegistry {
         Ok((total_received, total_transmitted))
     }
 
-    /// Legge disk IOPS reale (approssimazione basata su statistiche of the disco)
+    /// Read live disk-read IOPS (approximated from disk statistics)
     async fn read_disk_iops(&self) -> Result<u64, Box<dyn std::error::Error>> {
         let mut system = System::new();
         system.refresh_disks();
@@ -378,7 +377,7 @@ impl SavitriMetricsRegistry {
         Ok(total_iops)
     }
 
-    /// Legge disk write IOPS reale (approssimazione basata su statistiche of the disco)
+    /// Read live disk-write IOPS (approximated from disk statistics)
     async fn write_disk_iops(&self) -> Result<u64, Box<dyn std::error::Error>> {
         let mut system = System::new();
         system.refresh_disks();
@@ -403,7 +402,7 @@ impl SavitriMetricsRegistry {
         Ok(total_iops)
     }
 
-    /// Registra una transazione blockchain
+    /// Record a finalised block: height, block time, and time to finality.
     pub fn record_block(&self, height: u64, block_time_ms: u64, finality_ms: u64) {
         self.blockchain.block_height.set(height as f64);
         self.blockchain.block_time_seconds.observe(block_time_ms as f64 / 1000.0);
@@ -411,7 +410,7 @@ impl SavitriMetricsRegistry {
         self.blockchain.block_proposals_total.inc();
     }
 
-    /// Registra un round di consenso
+    /// Record one consensus round; failures count as a temporary fork.
     pub fn record_consensus_round(&self, round_type: &str, success: bool) {
         self.blockchain.consensus_rounds_total.inc();
         if !success {
@@ -426,13 +425,14 @@ impl SavitriMetricsRegistry {
         self.mempool.rejection_rate.set(rejection_rate);
     }
 
-    /// Registra aggiunta transazione mempool
+    /// Record a transaction admitted into the mempool, with its fee.
     pub fn record_mempool_add(&self, fee: u64) {
         self.mempool.transactions_added_total.inc();
         self.mempool.fee_distribution.observe(fee as f64);
     }
 
-    /// Registra rimozione transazione mempool
+    /// Record a transaction removed from the mempool and update the
+    /// running average queue time.
     pub fn record_mempool_remove(&self, wait_time_ms: u64) {
         self.mempool.transactions_removed_total.inc();
         
@@ -453,19 +453,20 @@ impl SavitriMetricsRegistry {
         self.network.discovery_rate.set(discovery_rate);
     }
 
-    /// Registra latenza peer
+    /// Record an observed peer latency sample.
     pub fn record_peer_latency(&self, peer_id: &str, latency_ms: u64) {
         self.network.peer_latency_ms.observe(latency_ms as f64);
         debug!("Recorded peer latency for {}: {}ms", peer_id, latency_ms);
     }
 
-    /// Registra propagazione Gossip
+    /// Record the propagation time of a GossipSub message.
     pub fn record_gossip_propagation(&self, message_type: &str, propagation_time_ms: u64) {
         self.network.gossip_propagation_time_ms.observe(propagation_time_ms as f64);
         self.network.gossip_messages_sent_total.inc();
     }
 
-    /// Registra esecuzione transazione
+    /// Record a transaction execution: timing, gas usage, and per-type
+    /// counters (contract deploy / contract call / other).
     pub fn record_transaction_execution(&self, tx_type: &str, execution_time_ms: u64, gas_used: u64) {
         self.execution.tx_execution_time_ms.observe(execution_time_ms as f64);
         self.execution.gas_used.observe(gas_used as f64);
@@ -483,7 +484,8 @@ impl SavitriMetricsRegistry {
         self.execution.dag_throughput_ops_per_sec.set(throughput);
     }
 
-    /// Registra evento di sicurezza
+    /// Record a security event and bump the corresponding counter, then
+    /// update the Byzantine-behaviour score according to severity.
     pub fn record_security_event(&self, event_type: &str, severity: &str) {
         match event_type {
             "failed_auth" => self.security.failed_auth_attempts_total.inc(),
@@ -517,18 +519,18 @@ impl SavitriMetricsRegistry {
         }
     }
 
-    /// Registra burn rate
+    /// Record a token burn and recompute the running burn rate per hour.
     pub fn record_token_burn(&self, amount: u64) {
         let current_burned = self.tokenomics.burned_tokens.get();
         self.tokenomics.burned_tokens.set(current_burned + amount as f64);
         
-        // Compute burn rate per ora basato sull'incremento
+        // Compute the per-hour burn rate from the increment
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
         
-        // In una implementazione reale, manteremmo uno storico temporale
+        // In a full implementation we would keep a time-series history
         let estimated_hourly_rate = if current_burned > 0.0 {
             // il rate orario è (X * 3600) / Y
             // Per ora usiamo una stima conservativa basata sull'ultimo burn
@@ -559,7 +561,7 @@ impl SavitriMetricsRegistry {
 /// Statistiche complete of the sistema
 #[derive(Debug, Clone)]
 pub struct SavitriMetricsStats {
-    /// Numero totale di metriche
+    /// Total number of metrics
     pub total_metrics: usize,
     /// Altezza blockchain
     pub blockchain_height: u64,
@@ -571,11 +573,11 @@ pub struct SavitriMetricsStats {
     pub cpu_usage: f64,
     /// Utilizzo memoria
     pub memory_usage: f64,
-    /// Score sicurezza
+    /// Security score
     pub security_score: f64,
 }
 
-// Implementazioni per le strutture metriche
+// Implementations for the metric structs
 impl BlockchainMetrics {
     fn new(registry: &Registry) -> Self {
         Self {
@@ -722,7 +724,7 @@ mod tests {
     async fn test_savitri_metrics_registry_creation() {
         let registry = SavitriMetricsRegistry::new();
         
-        // Check che le metriche siano state create
+        // Verify the metrics were created
         assert_eq!(registry.blockchain.block_height.get(), 0.0);
         assert_eq!(registry.mempool.size.get(), 0.0);
         assert_eq!(registry.network.connected_peers.get(), 0.0);
@@ -782,7 +784,7 @@ mod tests {
     async fn test_security_metrics() {
         let registry = SavitriMetricsRegistry::new();
         
-        // Registra evento sicurezza
+        // Record a security event
         registry.record_security_event("failed_auth", "high");
         registry.record_security_event("spam_detected", "medium");
         
@@ -810,7 +812,7 @@ mod tests {
         
         registry.update_hardware_metrics().await.unwrap();
         
-        // Check che le metriche siano state aggiornate
+        // Verify the metrics were updated
         assert!(registry.system.cpu_usage_percent.get() > 0.0);
         assert!(registry.system.memory_usage_mb.get() > 0.0);
     }
