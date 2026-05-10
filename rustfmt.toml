@@ -1,0 +1,18 @@
+# Conservative defaults; we keep stable-only options so `cargo fmt` works on
+# any toolchain >= 1.82 without nightly features.
+
+edition = "2021"
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
+use_small_heuristics = "Default"
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+match_arm_leading_pipes = "Never"
+fn_args_layout = "Tall"
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
+trailing_comma = "Vertical"
+trailing_semicolon = true
