@@ -1,5 +1,6 @@
 # Savitri Network
 
+[![CI](https://github.com/Savitri-Network/savitri-network/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Savitri-Network/savitri-network/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.82%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
 [![Edition](https://img.shields.io/badge/edition-2021-orange.svg?logo=rust)](https://doc.rust-lang.org/edition-guide/rust-2021/index.html)

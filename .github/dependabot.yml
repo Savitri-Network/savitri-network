@@ -1,0 +1,57 @@
+version: 2
+
+updates:
+  # Cargo dependencies — runs weekly across the whole workspace.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - rust
+    commit-message:
+      prefix: deps
+      include: scope
+    groups:
+      patch-updates:
+        applies-to: version-updates
+        update-types:
+          - patch
+      minor-updates:
+        applies-to: version-updates
+        update-types:
+          - minor
+      security-updates:
+        applies-to: security-updates
+    ignore:
+      # Pin major releases of cryptography crates explicitly so Dependabot
+      # doesn't open noisy major-bump PRs for security-critical libraries.
+      # Major bumps are reviewed manually as part of a security audit.
+      - dependency-name: ed25519-dalek
+        update-types: [version-update:semver-major]
+      - dependency-name: blake3
+        update-types: [version-update:semver-major]
+      - dependency-name: sha2
+        update-types: [version-update:semver-major]
+      - dependency-name: aes-gcm
+        update-types: [version-update:semver-major]
+      - dependency-name: rocksdb
+        update-types: [version-update:semver-major]
+      - dependency-name: libp2p
+        update-types: [version-update:semver-major]
+
+  # GitHub Actions — keep workflow actions current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: ci
