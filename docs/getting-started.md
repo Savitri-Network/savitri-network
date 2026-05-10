@@ -12,7 +12,7 @@ local node that produces and finalises blocks.
 
 ## 1. Prerequisites
 
-- **Rust** stable ≥ 1.82. The repository ships a `rust-toolchain.toml`
+- **Rust** stable ≥ 1.85. The repository ships a `rust-toolchain.toml`
   so `rustup` will install the right version automatically when you
   enter the directory.
 - A C / C++ toolchain:

@@ -1,4 +1,8 @@
 [toolchain]
-channel = "1.82.0"
+# 1.85.0 is the first stable that supports edition 2024, which a number
+# of transitive dependencies (getrandom 0.4, ahash 0.8.12+) now require.
+# Older crates that only need 2021 still work fine on 1.85; the bump is
+# additive only.
+channel = "1.85.0"
 components = ["rustfmt", "clippy"]
 profile = "minimal"

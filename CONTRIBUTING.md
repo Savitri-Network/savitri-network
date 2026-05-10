@@ -53,7 +53,7 @@ avoid duplicates.
 
 You need:
 
-- **Rust** stable ≥ 1.82 (a `rust-toolchain.toml` is provided so
+- **Rust** stable ≥ 1.85 (a `rust-toolchain.toml` is provided so
   `rustup` will pick this up automatically).
 - A C / C++ toolchain (MSVC on Windows, `build-essential` on Linux,
   Xcode CLT on macOS).
