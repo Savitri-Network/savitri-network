@@ -123,9 +123,8 @@ A real Savitri deployment splits the work between **masternodes**
 viable cluster is 4 masternodes plus 4 lightnodes; the recommended
 testnet topology is 5 masternodes plus 10–20 lightnodes.
 
-The repository does not ship Docker Compose files for the cluster yet
-— issue [#NN] tracks adding a one-command local testnet harness.
-Until then, the simplest approach is:
+The repository does not ship Docker Compose files for the cluster
+yet; the simplest approach is:
 
 1. Generate a shared genesis once (Section 3).
 2. Configure each node's TOML with a unique `node_id`, listen port,
