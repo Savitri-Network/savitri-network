@@ -20,10 +20,16 @@ pub type PublicKey = VerifyingKey;
 ///
 /// Le transazioni are ordinate lessicograficamente in base alla loro serializzazione
 pub fn compute_tx_root(txs: &[Transaction]) -> [u8; 64] {
-    // Ordina le transazioni in modo deterministico basato on the serializzazione bincode
+    // Sort the transactions deterministically by their bincode encoding.
+    // Invariant: every `Transaction` is bincode-serialisable by construction;
+    // a serialisation failure here would mean the type evolved in a way that
+    // breaks the on-wire contract and is a programmer error.
     let mut sorted_encodings: Vec<Vec<u8>> = txs
         .iter()
-        .map(|tx| bincode::serialize(tx).expect("tx encode"))
+        .map(|tx| {
+            bincode::serialize(tx)
+                .expect("invariant: Transaction is bincode-serialisable by construction")
+        })
         .collect();
 
     // Ordinamento lessicografico deterministico

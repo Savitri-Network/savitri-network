@@ -57,7 +57,15 @@ macro_rules! register_labeled_metric {
             let labeled_metric = $metric.with_label_values(&[
                 $(stringify!($label_name).to_string(), $label_value.to_string()),*
             ]);
-            $registry.register(Box::new(labeled_metric)).unwrap();
+            // Registration only fails on duplicate metric name, which is a
+            // programmer error in the calling crate.
+            $registry
+                .register(Box::new(labeled_metric))
+                .expect(concat!(
+                    "metric registration failed: duplicate labeled metric `",
+                    stringify!($metric),
+                    "`"
+                ));
         }
     };
 }

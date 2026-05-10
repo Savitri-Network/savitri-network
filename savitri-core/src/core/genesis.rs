@@ -20,7 +20,9 @@ pub fn sign_data(data: &[u8], key: &[u8]) -> Vec<u8> {
         tracing::error!("Invalid key length {}, expected 32 bytes", key.len());
         return Vec::new();
     }
-    let key_array: [u8; 32] = key.try_into().expect("length checked above");
+    let key_array: [u8; 32] = key
+        .try_into()
+        .expect("invariant: key length checked above to be 32");
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&key_array);
     signing_key.sign(data).to_bytes().to_vec()
 }
@@ -120,7 +122,9 @@ static GENESIS_SPEC: Lazy<GenesisSpec> = Lazy::new(|| {
     } else {
         include_str!("genesis/genesis.json")
     };
-    serde_json::from_str(raw).expect("genesis JSON must be valid")
+    // Invariant: the genesis JSON is bundled at compile time via `include_str!`,
+    // so a malformed file would have failed at build time and is unreachable here.
+    serde_json::from_str(raw).expect("invariant: bundled genesis JSON is valid at build time")
 });
 
 #[derive(Debug, Deserialize)]
@@ -297,7 +301,7 @@ fn create_genesis_vesting_schedules(timestamp: u64) -> Vec<VestingSchedule> {
     // Team vesting - 20M tokens over 4 years
     schedules.push(VestingSchedule {
         address: decode_hex::<32>("0x0000000000000000000000000000000000000001")
-            .unwrap()
+            .expect("invariant: hardcoded address literal is valid hex")
             .to_vec(),
         schedule_id: 1,
         amount: 20_000_000u128 * 10u128.pow(18),
@@ -312,7 +316,7 @@ fn create_genesis_vesting_schedules(timestamp: u64) -> Vec<VestingSchedule> {
     // Investors vesting - 50M tokens over 2 years
     schedules.push(VestingSchedule {
         address: decode_hex::<32>("0x0000000000000000000000000000000000000002")
-            .unwrap()
+            .expect("invariant: hardcoded address literal is valid hex")
             .to_vec(),
         schedule_id: 2,
         amount: 50_000_000u128 * 10u128.pow(18),
@@ -327,7 +331,7 @@ fn create_genesis_vesting_schedules(timestamp: u64) -> Vec<VestingSchedule> {
     // Foundation vesting - 30M tokens over 30M tokens over 10 years
     schedules.push(VestingSchedule {
         address: decode_hex::<32>("0x0000000000000000000000000000000000000003")
-            .unwrap()
+            .expect("invariant: hardcoded address literal is valid hex")
             .to_vec(),
         schedule_id: 3,
         amount: 30_000_000u128 * 10u128.pow(18),
@@ -342,7 +346,7 @@ fn create_genesis_vesting_schedules(timestamp: u64) -> Vec<VestingSchedule> {
     // Community rewards - 120M tokens over 8 years
     schedules.push(VestingSchedule {
         address: decode_hex::<32>("0x0000000000000000000000000000000000000004")
-            .unwrap()
+            .expect("invariant: hardcoded address literal is valid hex")
             .to_vec(),
         schedule_id: 4,
         amount: 120_000_000u128 * 10u128.pow(18),

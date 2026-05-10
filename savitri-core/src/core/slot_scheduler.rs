@@ -246,8 +246,11 @@ impl SlotScheduler {
             .validators
             .iter()
             .any(|v| v == &scheduler.inner.local_id);
+        // Invariant: `scheduler.inner` was just constructed inside this
+        // function and no clone has been handed out yet, so the Arc has a
+        // single strong reference and `get_mut` must succeed.
         Arc::get_mut(&mut scheduler.inner)
-            .expect("no other refs")
+            .expect("invariant: scheduler.inner has no other Arc clones at construction time")
             .is_validator = is_validator;
         if last_slot.map(|s| s < initial_slot).unwrap_or(true) {
             scheduler

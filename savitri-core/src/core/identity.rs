@@ -87,8 +87,17 @@ impl IdentityRegistry {
     pub fn register_handshake(&self, mapping: IdentityMapping) -> Result<()> {
         let peer_id = mapping.peer_id.clone();
 
-        let mut completed = self.completed_handshakes.lock().unwrap();
-        let mut mappings = self.identity_mappings.lock().unwrap();
+        // Locks here are only poisoned if another thread panicked while holding
+        // them; in that case the registry state is already inconsistent and we
+        // surface the failure as an error to the caller.
+        let mut completed = self
+            .completed_handshakes
+            .lock()
+            .map_err(|_| anyhow::anyhow!("identity registry: completed_handshakes mutex poisoned"))?;
+        let mut mappings = self
+            .identity_mappings
+            .lock()
+            .map_err(|_| anyhow::anyhow!("identity registry: identity_mappings mutex poisoned"))?;
 
         completed.insert(peer_id.clone());
         mappings.insert(peer_id, mapping);
@@ -98,14 +107,22 @@ impl IdentityRegistry {
 
     /// Check if a peer has completed handshake
     pub fn has_completed_handshake(&self, peer_id: &PeerId) -> bool {
-        let completed = self.completed_handshakes.lock().unwrap();
-        completed.contains(peer_id)
+        // If the lock is poisoned the registry state is corrupt and reporting
+        // "no completed handshake" is the safer default than panicking.
+        match self.completed_handshakes.lock() {
+            Ok(completed) => completed.contains(peer_id),
+            Err(_) => false,
+        }
     }
 
     /// Get identity mapping for a peer
     pub fn get_mapping(&self, peer_id: &PeerId) -> Option<IdentityMapping> {
-        let mappings = self.identity_mappings.lock().unwrap();
-        mappings.get(peer_id).cloned()
+        // Same defensive treatment as `has_completed_handshake`: a poisoned
+        // mutex returns `None` rather than panicking the caller.
+        self.identity_mappings
+            .lock()
+            .ok()
+            .and_then(|mappings| mappings.get(peer_id).cloned())
     }
 }
 
@@ -142,7 +159,12 @@ impl HandshakeManager {
             return Ok(false);
         }
 
-        let public_key = match ed25519_dalek::VerifyingKey::from_bytes(pubkey.try_into().unwrap()) {
+        // Invariant: the length check above (`pubkey.len() != 32`) guarantees
+        // that this conversion to `&[u8; 32]` succeeds.
+        let pubkey_arr: &[u8; 32] = pubkey
+            .try_into()
+            .expect("invariant: pubkey length checked above to be 32");
+        let public_key = match ed25519_dalek::VerifyingKey::from_bytes(pubkey_arr) {
             Ok(key) => key,
             Err(_) => return Ok(false),
         };
@@ -197,7 +219,10 @@ impl HandshakeManager {
                 let nonce = self.generate_nonce();
 
                 // Store pending request
-                let mut pending = self.pending_requests.lock().unwrap();
+                let mut pending = self
+                    .pending_requests
+                    .lock()
+                    .map_err(|_| anyhow::anyhow!("handshake manager: pending_requests mutex poisoned"))?;
                 pending.insert(
                     peer_id.clone(),
                     HandshakeRequest {
@@ -244,7 +269,10 @@ impl HandshakeManager {
                 signature,
             } => {
                 // Check if nonce was already used (replay protection)
-                let mut used_nonces = self.used_nonces.lock().unwrap();
+                let mut used_nonces = self
+                    .used_nonces
+                    .lock()
+                    .map_err(|_| anyhow::anyhow!("handshake manager: used_nonces mutex poisoned"))?;
                 if used_nonces.contains(&nonce) {
                     anyhow::bail!("Replay attack detected: nonce already used");
                 }
@@ -265,7 +293,10 @@ impl HandshakeManager {
                 used_nonces.insert(nonce);
 
                 // Remove from pending
-                let mut pending = self.pending_requests.lock().unwrap();
+                let mut pending = self
+                    .pending_requests
+                    .lock()
+                    .map_err(|_| anyhow::anyhow!("handshake manager: pending_requests mutex poisoned"))?;
                 pending.remove(&peer_id);
 
                 // Create identity mapping

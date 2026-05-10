@@ -699,7 +699,17 @@ impl TokenomicsMetrics {
 macro_rules! register_metrics {
     ($registry:expr, $($metric:ident),+) => {
         $(
-            $registry.register(Box::new($metric.clone())).unwrap();
+            // Registration only fails when a metric with the same name is
+            // already present, which is a programmer error (duplicate
+            // registration in this crate). Surface it with a descriptive
+            // message rather than a bare unwrap.
+            $registry
+                .register(Box::new($metric.clone()))
+                .expect(concat!(
+                    "metric registration failed: duplicate name `",
+                    stringify!($metric),
+                    "`"
+                ));
         )+
     };
 }

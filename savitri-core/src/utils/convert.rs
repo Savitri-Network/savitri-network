@@ -51,7 +51,13 @@ pub fn bytes_to_u64_le(bytes: &[u8]) -> Result<u64> {
     if bytes.len() < 8 {
         return Err(anyhow::anyhow!("Insufficient bytes for u64"));
     }
-    Ok(u64::from_le_bytes(bytes[..8].try_into().unwrap()))
+    // Invariant: the length check above guarantees `bytes[..8]` is exactly
+    // 8 bytes, which is the only requirement of `<[u8; 8]>::try_from`.
+    Ok(u64::from_le_bytes(
+        bytes[..8]
+            .try_into()
+            .expect("invariant: slice length checked above"),
+    ))
 }
 
 /// Convert bytes to u64 (big endian)
@@ -59,7 +65,11 @@ pub fn bytes_to_u64_be(bytes: &[u8]) -> Result<u64> {
     if bytes.len() < 8 {
         return Err(anyhow::anyhow!("Insufficient bytes for u64"));
     }
-    Ok(u64::from_be_bytes(bytes[..8].try_into().unwrap()))
+    Ok(u64::from_be_bytes(
+        bytes[..8]
+            .try_into()
+            .expect("invariant: slice length checked above"),
+    ))
 }
 
 /// Convert u64 to bytes (little endian)
@@ -77,7 +87,11 @@ pub fn bytes_to_u128_le(bytes: &[u8]) -> Result<u128> {
     if bytes.len() < 16 {
         return Err(anyhow::anyhow!("Insufficient bytes for u128"));
     }
-    Ok(u128::from_le_bytes(bytes[..16].try_into().unwrap()))
+    Ok(u128::from_le_bytes(
+        bytes[..16]
+            .try_into()
+            .expect("invariant: slice length checked above"),
+    ))
 }
 
 /// Convert bytes to u128 (big endian)
@@ -85,7 +99,11 @@ pub fn bytes_to_u128_be(bytes: &[u8]) -> Result<u128> {
     if bytes.len() < 16 {
         return Err(anyhow::anyhow!("Insufficient bytes for u128"));
     }
-    Ok(u128::from_be_bytes(bytes[..16].try_into().unwrap()))
+    Ok(u128::from_be_bytes(
+        bytes[..16]
+            .try_into()
+            .expect("invariant: slice length checked above"),
+    ))
 }
 
 /// Convert u128 to bytes (little endian)
@@ -217,8 +235,11 @@ pub fn ms_to_timestamp(ms: u64) -> u64 {
 
 /// Convert milliseconds to datetime
 pub fn ms_to_datetime(ms: u64) -> chrono::DateTime<chrono::Utc> {
-    chrono::DateTime::from_timestamp_millis(ms as i64)
-        .unwrap_or_else(|| chrono::DateTime::from_timestamp(0, 0).unwrap())
+    chrono::DateTime::from_timestamp_millis(ms as i64).unwrap_or_else(|| {
+        // Invariant: (0, 0) is the UNIX epoch and is always a valid timestamp.
+        chrono::DateTime::from_timestamp(0, 0)
+            .expect("invariant: UNIX epoch is always representable")
+    })
 }
 
 /// Calculate duration between two timestamps
