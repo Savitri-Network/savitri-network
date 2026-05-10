@@ -753,7 +753,7 @@ async fn run() -> Result<()> {
     // Set the group manager reference in consensus
     group_consensus.initialize_available_lightnodes().await?;
 
-    // Spawn rewards task (testnet SAVI: 50 light, 100 masternode per cycle)
+    // Spawn rewards task (testnet SAVT: 50 light, 100 masternode per cycle)
     #[cfg(feature = "storage")]
     {
         use savitri_masternode::rewards::NodeType;
