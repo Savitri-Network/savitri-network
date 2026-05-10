@@ -20,7 +20,8 @@ are **not** maintained.
 ## Reporting a vulnerability
 
 **Please do not open a public GitHub issue for a suspected
-vulnerability.**
+vulnerability.** For non-security bugs and feature requests, follow the
+normal flow described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Instead, contact the maintainers by one of the following channels:
 

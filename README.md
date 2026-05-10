@@ -86,6 +86,7 @@ makes finalization observable to the rest of the network.
   [open milestones](https://github.com/Savitri-Network/savitri-network/milestones)
 - 🤝 **How to contribute**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - 🛡️ **Security policy**: [`SECURITY.md`](SECURITY.md)
+- 🤲 **Code of conduct**: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 - 📜 **Changelog**: [`CHANGELOG.md`](CHANGELOG.md)
 
 In-tree protocol guides (rendered on

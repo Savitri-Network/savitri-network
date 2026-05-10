@@ -87,3 +87,14 @@ example:
 The roadmap targets a stable `1.0` release once Phase 1 + Phase 2 are
 complete and at least the foundational items in Phase 3 are in place.
 Until then APIs and wire formats may change between minor versions.
+
+---
+
+## Getting involved
+
+- Read the project [`README.md`](README.md) for an architectural
+  overview.
+- Pick a `good first issue` from the list above and follow the
+  process in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- For security-sensitive findings, follow the disclosure policy in
+  [`SECURITY.md`](SECURITY.md) — never open a public issue for them.
