@@ -24,7 +24,7 @@ vulnerability.**
 
 Instead, contact the maintainers by one of the following channels:
 
-- **Email**: `security@savitri.network` (preferred). PGP key on
+- **Email**: `security@savitrinetwork.com` (preferred). PGP key on
   request.
 - **GitHub private advisory**: open a draft security advisory at
   https://github.com/Savitri-Network/savitri-network/security/advisories/new
@@ -86,6 +86,16 @@ shorten the timeline and publish an emergency advisory.
   configuration explicitly documented as insecure.
 - Social-engineering attacks against the maintainers or community.
 - Findings from automated scanners without a manual reproduction.
+
+## Bug bounty programme
+
+A formal bug bounty programme is **in preparation** and will be
+announced in a dedicated repository post and on the project website.
+Until that announcement, valid security reports are still acknowledged
+publicly (with the reporter's consent) through the channels listed in
+the *Hall of fame* section below; reporters who would have qualified
+under the bounty rules will be retroactively eligible once the
+programme launches.
 
 ## Hall of fame
 
