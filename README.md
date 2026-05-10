@@ -78,6 +78,31 @@ makes finalization observable to the rest of the network.
 
 ---
 
+## Documentation
+
+- 🌐 **Project website**: [savitrinetwork.com](https://savitrinetwork.com)
+- 📚 **Full documentation**: [docs.savitrinetwork.com](https://docs.savitrinetwork.com)
+- 🗺️ **Roadmap**: [`ROADMAP.md`](ROADMAP.md) and the
+  [open milestones](https://github.com/Savitri-Network/savitri-network/milestones)
+- 🤝 **How to contribute**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- 🛡️ **Security policy**: [`SECURITY.md`](SECURITY.md)
+- 📜 **Changelog**: [`CHANGELOG.md`](CHANGELOG.md)
+
+In-tree protocol guides (rendered on
+[docs.savitrinetwork.com](https://docs.savitrinetwork.com) once it is
+published):
+
+- [`docs/getting-started.md`](docs/getting-started.md) — build a node
+  and submit your first transaction
+- [`docs/consensus.md`](docs/consensus.md) — Proof-of-Unity + BFT
+  finalisation model
+- [`docs/group-formation.md`](docs/group-formation.md) — group
+  lifecycle and proposer election
+- [`docs/transactions.md`](docs/transactions.md) — wire format,
+  signing, fees
+
+---
+
 ## Requirements
 
 - Rust stable ≥ 1.82
