@@ -4,7 +4,7 @@ version = "0.1.0"
 default-run = "savitri-lightnode"
 
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 authors = ["Savitri Network"]
 description = "Light node implementation for Savitri Network - optimized for mobile and desktop"
 homepage = "https://savitrinetwork.com"

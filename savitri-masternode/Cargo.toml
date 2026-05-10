@@ -2,7 +2,7 @@
 name = "savitri-masternode"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 authors = ["Savitri Network"]
 description = "Masternode implementation for Savitri Network - full validator node"
 homepage = "https://savitrinetwork.com"
