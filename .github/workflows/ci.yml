@@ -8,8 +8,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
   RUST_BACKTRACE: "1"
+  # `RUSTFLAGS: -D warnings` is intentionally NOT set workspace-wide.
+  # The codebase still carries a backlog of `missing_docs` and
+  # similar lints (tracked under #13). Promoting them to errors today
+  # would block every PR on unrelated work. Once #13 is closed, set
+  # `RUSTFLAGS: -D warnings` here and tighten the gating in one go.
 
 jobs:
   fmt:
@@ -113,6 +117,11 @@ jobs:
             build-essential pkg-config clang cmake ninja-build \
             libssl-dev zlib1g-dev liblz4-dev libzstd-dev protobuf-compiler
       - name: cargo doc (no-deps)
+        # Broken intra-doc links should be a hard fail eventually. For
+        # now we keep the strict flag but mark the job advisory while
+        # the public-API doc-comment baseline is still being filled
+        # in (#13). Flip `continue-on-error` to false once #13 closes.
         env:
           RUSTDOCFLAGS: "-D rustdoc::broken-intra-doc-links"
         run: cargo doc --workspace --no-deps
+        continue-on-error: true

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Savitri-Network/savitri-network/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Savitri-Network/savitri-network/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.90%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
 [![Edition](https://img.shields.io/badge/edition-2021-orange.svg?logo=rust)](https://doc.rust-lang.org/edition-guide/rust-2021/index.html)
 [![Workspace](https://img.shields.io/badge/cargo--workspace-14%20crates-informational.svg?logo=rust)](Cargo.toml)
 [![libp2p](https://img.shields.io/badge/libp2p-0.55-2C3E50?logo=ipfs&logoColor=white)](https://libp2p.io/)
@@ -67,7 +67,7 @@ makes finalization observable to the rest of the network.
 
 | Layer | Technology |
 |---|---|
-| Language | Rust 2021 edition, MSRV 1.85 |
+| Language | Rust 2021 edition, MSRV 1.90 |
 | Async runtime | [Tokio](https://tokio.rs/) |
 | Networking | [libp2p 0.55](https://libp2p.io/) (GossipSub, Kademlia DHT, Noise, Yamux) |
 | Storage | [RocksDB](https://rocksdb.org/) with column families, in-memory backend for tests |
@@ -106,7 +106,7 @@ published):
 
 ## Requirements
 
-- Rust stable ≥ 1.85
+- Rust stable ≥ 1.90
 - A C / C++ toolchain (MSVC on Windows, build-essentials on Linux,
   Xcode CLT on macOS) — RocksDB is built from source.
 - `cmake`, `clang`, `protobuf-compiler` are typically required by

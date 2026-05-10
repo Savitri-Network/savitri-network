@@ -1,8 +1,10 @@
 [toolchain]
-# 1.85.0 is the first stable that supports edition 2024, which a number
-# of transitive dependencies (getrandom 0.4, ahash 0.8.12+) now require.
-# Older crates that only need 2021 still work fine on 1.85; the bump is
-# additive only.
-channel = "1.85.0"
+# Several transitive dependencies (`time 0.3.47`, `icu_*`, etc.) now
+# require rustc 1.88+, and `getrandom 0.4` / `ahash 0.8.12+` need
+# edition 2024 (Rust 1.85+). 1.90 is the latest stable at the time of
+# writing and satisfies every constraint in the resolved tree. Older
+# edition-2021 crates in the workspace continue to build unchanged;
+# the bump is additive only.
+channel = "1.90.0"
 components = ["rustfmt", "clippy"]
 profile = "minimal"
