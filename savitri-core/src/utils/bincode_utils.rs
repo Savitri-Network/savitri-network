@@ -45,7 +45,7 @@ use bincode::Options;
 /// which was causing "unexpected end of file" errors in MonolithHeader.
 pub fn consensus_bincode() -> impl Options {
     bincode::DefaultOptions::new()
-        .with_fixint_encoding()  // CRITICAL: Always use fixed-width integers
+        .with_fixint_encoding() // CRITICAL: Always use fixed-width integers
         .allow_trailing_bytes()
 }
 

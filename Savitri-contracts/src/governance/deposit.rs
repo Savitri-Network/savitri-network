@@ -169,9 +169,7 @@ impl DepositManager {
                 // Returns i vote token al creator
                 self.unlock_deposit(storage, proposal)
             }
-            ProposalStatus::Rejected => {
-                self.burn_deposit(storage, proposal)
-            }
+            ProposalStatus::Rejected => self.burn_deposit(storage, proposal),
             _ => {
                 anyhow::bail!(
                     "Proposta non finalizzata: stato attuale {:?}. Solo proposte Approved o Rejected possono essere gestite.",

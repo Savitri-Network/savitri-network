@@ -47,42 +47,33 @@ pub fn build_gossipsub(identity: IdentityKeypair) -> Result<libp2p::gossipsub::B
         // MESH PARAMETERS - ROUND 8: Scaled for 25-30 node networks (20 LN + 5 MN + TX generators).
         // mesh_n=8 was insufficient for 25+ nodes: caused 22K+ IDONTWANT errors and unstable
         // mesh topology leading to missed block gossip (Block payload still missing on MN).
-        .mesh_n_low(6)              // Minimo 6 peer (was 4) — ensures quorum connectivity
-        .mesh_n(12)                 // Target 12 peer (was 8) — covers ~50% of 25-node network
-        .mesh_n_high(18)            // Max 18 peer (was 12) — room for all LN + MN + TX gen
-        .mesh_outbound_min(4)       // Minimo 4 connessioni outbound (was 3)
-
+        .mesh_n_low(6) // Minimo 6 peer (was 4) — ensures quorum connectivity
+        .mesh_n(12) // Target 12 peer (was 8) — covers ~50% of 25-node network
+        .mesh_n_high(18) // Max 18 peer (was 12) — room for all LN + MN + TX gen
+        .mesh_outbound_min(4) // Minimo 4 connessioni outbound (was 3)
         // HEARTBEAT - Ottimizzato per reti grandi (120 nodi)
-        .heartbeat_interval(Duration::from_millis(7000))  // 7s: riduce carico heartbeat per reti grandi
-
+        .heartbeat_interval(Duration::from_millis(7000)) // 7s: riduce carico heartbeat per reti grandi
         // TIMEOUTS - Ottimizzati per reti più grandi
         .fanout_ttl(Duration::from_secs(30))
-        .history_length(10)         // Aumentato per buffer più grande (da 3)
-        .history_gossip(5)          // Aumentato per più gossip history (da 2)
-
+        .history_length(10) // Aumentato per buffer più grande (da 3)
+        .history_gossip(5) // Aumentato per più gossip history (da 2)
         // GRAFT/PRUNE - Ottimizzati per stabilità rapida
         .graft_flood_threshold(Duration::from_secs(5))
-        .prune_peers(8)            // Pruning più aggressiva
-
+        .prune_peers(8) // Pruning più aggressiva
         // QUEUE CONFIGURATION - Aumentato 4x per testnet 120 nodi
-        .max_transmit_size(4_194_304)  // 4MB per message (supports blocks with 2000+ TXs in JSON serialization)
-
+        .max_transmit_size(4_194_304) // 4MB per message (supports blocks with 2000+ TXs in JSON serialization)
         // VALIDATION
         .validation_mode(ValidationMode::Permissive)
-
         // DUPLICATE DETECTION - Cache più lunga per reti grandi
-        .duplicate_cache_time(Duration::from_secs(60))  // 60s (da 30s)
-
+        .duplicate_cache_time(Duration::from_secs(60)) // 60s (da 30s)
         // CONNECTION HANDLER QUEUE - ROUND 7: Increased from 25K to 50K to prevent "Send Queue full"
         // on lightnodes during high TX throughput. The previous 25K was still causing 196K+ warnings
         // in a 6-minute test, saturating 3 out of 10 LNs.
         .connection_handler_queue_len(50000)
-
         // PUBLISH - flood_publish disabled: Fix 2 (30s mesh delay) ensures mesh is formed before
         // messages are published. flood_publish(true) was sending every message to ALL peers (not
         // just mesh), massively amplifying traffic and causing Send Queue full on lightnodes.
         .flood_publish(false)
-
         // e propagazione allineate tra LN e MN. Diverso formato (es. to_string()) darebbe ID diversi
         // per lo stesso messaggio e duplicati / propagazione incoerente.
         .message_id_fn(|message| {
@@ -92,7 +83,6 @@ pub fn build_gossipsub(identity: IdentityKeypair) -> Result<libp2p::gossipsub::B
             std::hash::Hash::hash(&message.data, &mut hasher);
             MessageId::from(hasher.finish().to_be_bytes().to_vec())
         })
-
         .build()
         .context("gossipsub config")?;
 

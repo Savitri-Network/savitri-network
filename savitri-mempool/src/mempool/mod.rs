@@ -5,17 +5,17 @@ pub mod dual_token_integration;
 pub mod handle;
 pub mod integration;
 pub mod metrics;
+pub mod nonce_limits; // Centralized nonce-gap constants (audit §2.2)
 pub mod prevalidation;
 pub mod queued_pool; // Queued pool for future nonce transactions
 pub mod replay_prevention; // Comprehensive replay prevention system
-pub mod nonce_limits; // Centralized nonce-gap constants (audit §2.2)
 pub mod types; // Class-aware tx types (TxClass, MempoolTx, PrevalidatedTx, …)
-// Legacy mempool implementation has been moved to legacy_not_used/mempool_legacy.rs
-// It is no longer used in production - MempoolPipeline is the primary implementation
-// pub mod legacy; // MOVED TO legacy_not_used/mempool_legacy.rs
-pub mod sharded; // Experimental - for future high-concurrency edge nodes
-pub mod hybrid; // Hybrid architecture: Sharded ingress + Monolithic production
-// pub mod tests; // Advanced integration tests for atomic nonce resolution (temporarily disabled)
+               // Legacy mempool implementation has been moved to legacy_not_used/mempool_legacy.rs
+               // It is no longer used in production - MempoolPipeline is the primary implementation
+               // pub mod legacy; // MOVED TO legacy_not_used/mempool_legacy.rs
+pub mod hybrid;
+pub mod sharded; // Experimental - for future high-concurrency edge nodes // Hybrid architecture: Sharded ingress + Monolithic production
+                                                                          // pub mod tests; // Advanced integration tests for atomic nonce resolution (temporarily disabled)
 pub mod simple_tests; // Simple working tests for atomic nonce resolution
 
 // Legacy mempool implementation has been moved to legacy_not_used/

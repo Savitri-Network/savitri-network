@@ -820,7 +820,10 @@ async fn run() -> Result<()> {
         };
         let rewards_period_secs = rewards_config.reward_period_secs;
         let _rewards_handle = spawn_rewards_task(storage, rewards_config, node_provider);
-        info!(reward_period_secs = rewards_period_secs, "Rewards job spawned");
+        info!(
+            reward_period_secs = rewards_period_secs,
+            "Rewards job spawned"
+        );
     }
 
     // Extract Ed25519 signing key from libp2p identity

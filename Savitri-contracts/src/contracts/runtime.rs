@@ -388,9 +388,10 @@ impl Runtime {
     /// # Returns
     /// Timestamp of the blocco corrente (Unix timestamp in secondi)
     pub fn block_timestamp(&self) -> u64 {
-        *self.block_timestamp.read().unwrap_or_else(|poisoned| {
-            poisoned.into_inner()
-        })
+        *self
+            .block_timestamp
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Set il timestamp deterministico of the blocco
@@ -525,9 +526,10 @@ impl Runtime {
     ///
     /// # Performance
     pub fn overlay_snapshot(&self) -> BTreeMap<Vec<u8>, Account> {
-        let overlay = self.overlay.read().unwrap_or_else(|poisoned| {
-            poisoned.into_inner()
-        });
+        let overlay = self
+            .overlay
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         // Check memory bounds
         let overlay_size = overlay

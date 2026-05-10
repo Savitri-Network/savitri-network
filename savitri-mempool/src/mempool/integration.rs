@@ -138,7 +138,8 @@ fn create_signed_tx_from_bytes(raw_tx: &[u8]) -> Option<SignedTx> {
     // Fallback: core Transaction format
     if let Some(transaction) = deserialize_signed_tx(raw_tx) {
         return Some(SignedTx {
-            from: hex::decode(&transaction.from).unwrap_or_else(|_| transaction.from.as_bytes().to_vec()),
+            from: hex::decode(&transaction.from)
+                .unwrap_or_else(|_| transaction.from.as_bytes().to_vec()),
             to: hex::decode(&transaction.to).unwrap_or_else(|_| transaction.to.as_bytes().to_vec()),
             amount: transaction.amount,
             nonce: transaction.nonce,
@@ -149,7 +150,10 @@ fn create_signed_tx_from_bytes(raw_tx: &[u8]) -> Option<SignedTx> {
         });
     }
 
-    tracing::warn!(bytes_len = raw_tx.len(), "Failed to deserialize TX (all formats) — dropping");
+    tracing::warn!(
+        bytes_len = raw_tx.len(),
+        "Failed to deserialize TX (all formats) — dropping"
+    );
     None
 }
 
@@ -216,7 +220,7 @@ impl MempoolStateTracker {
             state_history: Vec::new(),
             max_history_size: 10, // Keep the last 10 blocks
             block_counter: 0,
-            update_interval: 5,   // Refresh every 5 blocks
+            update_interval: 5, // Refresh every 5 blocks
             last_update_timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -1427,8 +1431,9 @@ impl MempoolPipeline {
         self.track_mempool_state(&mempool_txs);
 
         // Step 3: Retrieve transaction bytes from storage
-        let tx_bytes = get_tx_bytes_from_handles(&self.tx_storage, &Mempool::extract_handles(&mempool_txs));
-        
+        let tx_bytes =
+            get_tx_bytes_from_handles(&self.tx_storage, &Mempool::extract_handles(&mempool_txs));
+
         // Step 4: Create transactions from bytes (parallel deserialization).
         // now returns Option<SignedTx>; filter_map drops both missing bytes
         // (None opt_bytes) AND undeserializable bytes (Some(None) from helper).
@@ -1440,7 +1445,8 @@ impl MempoolPipeline {
             .filter_map(|opt_bytes| {
                 let bytes = opt_bytes?;
                 create_signed_tx_from_bytes(&bytes)
-            }).collect();
+            })
+            .collect();
 
         // Step 5: Pipeline Prefetching - Trigger lookahead for batch N+1
         if let Some(ref prefetcher) = self.pipeline_prefetcher {
@@ -1550,7 +1556,8 @@ impl MempoolPipeline {
             .filter_map(|opt_bytes| {
                 let bytes = opt_bytes?;
                 create_signed_tx_from_bytes(&bytes)
-            }).collect()
+            })
+            .collect()
     }
 
     /// Find transaction handles from signed transactions by matching hashes
@@ -1892,7 +1899,9 @@ impl MempoolPipeline {
     /// Returns (main_total, ready_vec_len, sum_queue, non_empty_queues,
     /// queued_total, queued_accounts, queued_promoted, queued_expired,
     /// queued_rej_full, queued_rej_gap).
-    pub fn diag_full_state(&self) -> (usize, usize, usize, usize, usize, usize, u64, u64, u64, u64) {
+    pub fn diag_full_state(
+        &self,
+    ) -> (usize, usize, usize, usize, usize, usize, u64, u64, u64, u64) {
         let (main_total, rv_len, sum_queue, non_empty) = match self.lock_mempool() {
             Ok(mp) => mp.diag_state(),
             Err(_) => (0, 0, 0, 0),
@@ -1902,10 +1911,16 @@ impl MempoolPipeline {
             Err(_) => return (main_total, rv_len, sum_queue, non_empty, 0, 0, 0, 0, 0, 0),
         };
         (
-            main_total, rv_len, sum_queue, non_empty,
-            qstats.total_queued, qstats.accounts_with_queued,
-            qstats.total_promoted, qstats.total_expired,
-            qstats.total_rejected_full, qstats.total_rejected_gap_too_large,
+            main_total,
+            rv_len,
+            sum_queue,
+            non_empty,
+            qstats.total_queued,
+            qstats.accounts_with_queued,
+            qstats.total_promoted,
+            qstats.total_expired,
+            qstats.total_rejected_full,
+            qstats.total_rejected_gap_too_large,
         )
     }
 

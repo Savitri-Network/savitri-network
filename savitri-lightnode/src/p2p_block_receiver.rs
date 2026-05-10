@@ -430,9 +430,8 @@ impl BlockReceiver {
         if stats.blocks_validated == 1 {
             stats.average_validation_time = validation_time;
         } else {
-            stats.average_validation_time = (stats.average_validation_time
-                + validation_time)
-                / stats.blocks_validated as f64;
+            stats.average_validation_time =
+                (stats.average_validation_time + validation_time) / stats.blocks_validated as f64;
         }
 
         // Update total transactions

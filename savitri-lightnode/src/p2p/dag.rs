@@ -324,7 +324,8 @@ impl DagManager {
     /// Returns list of missing parent hashes (empty = all valid).
     pub async fn validate_parents(&self, parent_hashes: &[BlockHash]) -> Vec<BlockHash> {
         let s = self.state.read().await;
-        parent_hashes.iter()
+        parent_hashes
+            .iter()
             .filter(|h| !s.blocks.contains_key(*h) && **h != [0u8; 64]) // skip genesis zero-hash
             .copied()
             .collect()

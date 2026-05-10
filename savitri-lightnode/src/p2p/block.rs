@@ -504,7 +504,9 @@ impl MempoolPipeline {
 
     /// `RealMempoolPipeline::diag_full_state` for the periodic 10s flight
     /// recorder spawned in main.rs.
-    pub fn diag_full_state(&self) -> (usize, usize, usize, usize, usize, usize, u64, u64, u64, u64) {
+    pub fn diag_full_state(
+        &self,
+    ) -> (usize, usize, usize, usize, usize, usize, u64, u64, u64, u64) {
         self.inner.diag_full_state()
     }
 

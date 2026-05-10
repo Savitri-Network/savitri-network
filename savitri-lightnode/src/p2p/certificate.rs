@@ -438,7 +438,11 @@ pub fn validate_certificate_masternode(
     // enforcing the bound unconditionally rejects every old cert during sync
     // and stalls the LN. After a coordinated wipe + post-4.4b genesis you can
     // set the env to harden this layer in production.
-    if std::env::var("SAVITRI_LN_ENFORCE_QUORUM").map(|v| v == "1").unwrap_or(false) && committee_size > 0 {
+    if std::env::var("SAVITRI_LN_ENFORCE_QUORUM")
+        .map(|v| v == "1")
+        .unwrap_or(false)
+        && committee_size > 0
+    {
         let required = (2 * committee_size + 2) / 3;
         if certificate.voters.len() < required {
             return Err(format!(

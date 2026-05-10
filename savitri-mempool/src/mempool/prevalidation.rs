@@ -1159,9 +1159,7 @@ impl Prevalidator {
                     None
                 }
             }
-            Err(_) => {
-                None
-            }
+            Err(_) => None,
         }
     }
 

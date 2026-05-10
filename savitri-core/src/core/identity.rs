@@ -90,10 +90,9 @@ impl IdentityRegistry {
         // Locks here are only poisoned if another thread panicked while holding
         // them; in that case the registry state is already inconsistent and we
         // surface the failure as an error to the caller.
-        let mut completed = self
-            .completed_handshakes
-            .lock()
-            .map_err(|_| anyhow::anyhow!("identity registry: completed_handshakes mutex poisoned"))?;
+        let mut completed = self.completed_handshakes.lock().map_err(|_| {
+            anyhow::anyhow!("identity registry: completed_handshakes mutex poisoned")
+        })?;
         let mut mappings = self
             .identity_mappings
             .lock()
@@ -219,10 +218,9 @@ impl HandshakeManager {
                 let nonce = self.generate_nonce();
 
                 // Store pending request
-                let mut pending = self
-                    .pending_requests
-                    .lock()
-                    .map_err(|_| anyhow::anyhow!("handshake manager: pending_requests mutex poisoned"))?;
+                let mut pending = self.pending_requests.lock().map_err(|_| {
+                    anyhow::anyhow!("handshake manager: pending_requests mutex poisoned")
+                })?;
                 pending.insert(
                     peer_id.clone(),
                     HandshakeRequest {
@@ -269,10 +267,9 @@ impl HandshakeManager {
                 signature,
             } => {
                 // Check if nonce was already used (replay protection)
-                let mut used_nonces = self
-                    .used_nonces
-                    .lock()
-                    .map_err(|_| anyhow::anyhow!("handshake manager: used_nonces mutex poisoned"))?;
+                let mut used_nonces = self.used_nonces.lock().map_err(|_| {
+                    anyhow::anyhow!("handshake manager: used_nonces mutex poisoned")
+                })?;
                 if used_nonces.contains(&nonce) {
                     anyhow::bail!("Replay attack detected: nonce already used");
                 }
@@ -293,10 +290,9 @@ impl HandshakeManager {
                 used_nonces.insert(nonce);
 
                 // Remove from pending
-                let mut pending = self
-                    .pending_requests
-                    .lock()
-                    .map_err(|_| anyhow::anyhow!("handshake manager: pending_requests mutex poisoned"))?;
+                let mut pending = self.pending_requests.lock().map_err(|_| {
+                    anyhow::anyhow!("handshake manager: pending_requests mutex poisoned")
+                })?;
                 pending.remove(&peer_id);
 
                 // Create identity mapping

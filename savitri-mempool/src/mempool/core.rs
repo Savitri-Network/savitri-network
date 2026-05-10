@@ -300,7 +300,7 @@ impl Mempool {
             // admitted properly. Without this granularity the 1/100 sample
             // missed exactly the low-nonce TX that the loadtest emits at boot.
             {
-                use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+                use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
                 static DIAG_50_ADMISSION_CALLS: AtomicU64 = AtomicU64::new(0);
                 static NONCE_DEBUG_CACHED: AtomicBool = AtomicBool::new(false);
                 static NONCE_DEBUG_INIT: AtomicBool = AtomicBool::new(false);
@@ -535,7 +535,7 @@ impl Mempool {
         // nonce (drain_nonce_skip H2 / H3). Limited to first 5 senders to
         // avoid log flood. Each call gets a unique drain_call counter.
         {
-            use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
+            use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
             static NONCE_DEBUG_CACHED: AtomicBool = AtomicBool::new(false);
             static NONCE_DEBUG_INIT: AtomicBool = AtomicBool::new(false);
             static DRAIN_DEBUG_CALLS: AtomicU64 = AtomicU64::new(0);
@@ -549,7 +549,12 @@ impl Mempool {
                 let n = DRAIN_DEBUG_CALLS.fetch_add(1, Ordering::Relaxed) + 1;
                 if n <= 50 {
                     let mut samples = Vec::new();
-                    for rq in self.ready_vec.iter().filter(|q| !q.queue.is_empty()).take(5) {
+                    for rq in self
+                        .ready_vec
+                        .iter()
+                        .filter(|q| !q.queue.is_empty())
+                        .take(5)
+                    {
                         let front_nonce = rq.queue.front().map(|t| t.nonce).unwrap_or(u64::MAX);
                         let queue_len = rq.queue.len();
                         samples.push(format!(
@@ -801,7 +806,7 @@ impl Mempool {
                 "DIAG[ttl-purge]: TX expired and removed from mempool"
             );
         }
-        
+
         // Update mempool size metrics
         self.update_metrics();
     }

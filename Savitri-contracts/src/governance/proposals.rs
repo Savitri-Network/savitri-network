@@ -86,9 +86,7 @@ pub enum ProposalAction {
         standard_version: String,
     },
     /// Modifiche non-core
-    NonCore {
-        description: String,
-    },
+    NonCore { description: String },
     ContractUpgrade {
         contract_address: Vec<u8>,
         /// Code hash of the nuovo bytecode (32 bytes)

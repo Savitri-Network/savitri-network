@@ -410,8 +410,7 @@ impl CertificateReceiver {
         if stats.certificates_validated == 1 {
             stats.average_validation_time = validation_time;
         } else {
-            stats.average_validation_time = (stats.average_validation_time
-                + validation_time)
+            stats.average_validation_time = (stats.average_validation_time + validation_time)
                 / stats.certificates_validated as f64;
         }
     }

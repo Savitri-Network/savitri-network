@@ -789,7 +789,8 @@ impl FallbackStrategy {
         }
 
         // Check failure rate
-        let recent_failures: Vec<_> = failures.iter()
+        let recent_failures: Vec<_> = failures
+            .iter()
             .filter(|f| now - f.timestamp < 300) // Last 5 minutes
             .collect();
 

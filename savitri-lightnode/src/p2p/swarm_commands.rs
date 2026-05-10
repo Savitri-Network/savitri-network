@@ -18,7 +18,10 @@ use crate::p2p::consensus_protocol::ConsensusMessage;
 #[derive(Debug)]
 pub enum SwarmCommand {
     /// Pubblica un messaggio gossipsub su un topic.
-    Publish { topic: IdentTopic, payload: Vec<u8> },
+    Publish {
+        topic: IdentTopic,
+        payload: Vec<u8>,
+    },
 
     /// Pubblica piu' messaggi gossipsub in sequenza (atomicamente dal punto di vista of the chiamante).
     PublishBatch {
@@ -32,22 +35,35 @@ pub enum SwarmCommand {
     },
 
     /// Sottoscrive lo swarm a un topic gossipsub.
-    Subscribe { topic: IdentTopic },
+    Subscribe {
+        topic: IdentTopic,
+    },
 
     /// Rimuove la sottoscrizione a un topic gossipsub.
-    Unsubscribe { topic: IdentTopic },
+    Unsubscribe {
+        topic: IdentTopic,
+    },
 
     /// Adds un peer esplicito alla mesh gossipsub (prioritario).
-    AddExplicitPeer { peer_id: PeerId },
+    AddExplicitPeer {
+        peer_id: PeerId,
+    },
 
     /// Rimuove un peer esplicito dalla mesh gossipsub.
-    RemoveExplicitPeer { peer_id: PeerId },
+    RemoveExplicitPeer {
+        peer_id: PeerId,
+    },
 
     /// Inserisce un record in the DHT Kademlia.
-    KadPutRecord { key: String, value: Vec<u8> },
+    KadPutRecord {
+        key: String,
+        value: Vec<u8>,
+    },
 
     /// Richiede un record dalla DHT Kademlia.
-    KadGetRecord { key: String },
+    KadGetRecord {
+        key: String,
+    },
 
     /// Send a consensus message directly to a peer via request-response protocol.
     SendConsensusRequest {

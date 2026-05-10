@@ -877,8 +877,7 @@ impl GroupFormationManager {
             let active_groups = self.active_groups.read().await;
             if !active_groups.is_empty() {
                 let all_healthy = active_groups.values().all(|g| {
-                    g.status == GroupStatus::Active
-                        && g.members.len() >= self.config.min_group_size
+                    g.status == GroupStatus::Active && g.members.len() >= self.config.min_group_size
                 });
                 if all_healthy {
                     let current_epoch = self.scheduler.current_epoch();

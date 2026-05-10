@@ -87,9 +87,14 @@ impl LightnodeTxRouter {
         local_group: LocalGroupFn,
         swarm_command_tx: mpsc::Sender<SwarmCommand>,
     ) -> Self {
-        let proposer_cache =
-            ProposerCache::default().with_swarm_tx(swarm_command_tx.clone());
-        Self::new_with_cache(shard_to_group, num_shards, local_group, swarm_command_tx, proposer_cache)
+        let proposer_cache = ProposerCache::default().with_swarm_tx(swarm_command_tx.clone());
+        Self::new_with_cache(
+            shard_to_group,
+            num_shards,
+            local_group,
+            swarm_command_tx,
+            proposer_cache,
+        )
     }
 
     /// `ProposerCache`. Lets the network task (which receives
@@ -271,42 +276,46 @@ impl TxRouter for LightnodeTxRouter {
         //   * On cache miss we additionally fire-and-forget a Kademlia
         //     refresh so the next route() may hit the cache.
         let proposer_entry = self.proposer_cache.try_get(&target_group);
-        let direct_attempted =
-            if self.dispatcher.is_direct_enabled()
-                && proposer_entry
-                    .as_ref()
-                    .map(|e| e.source != ProposerSource::Stale)
-                    .unwrap_or(false)
+        let direct_attempted = if self.dispatcher.is_direct_enabled()
+            && proposer_entry
+                .as_ref()
+                .map(|e| e.source != ProposerSource::Stale)
+                .unwrap_or(false)
+        {
+            let entry = proposer_entry.as_ref().unwrap();
+            match self
+                .dispatcher
+                .forward_direct(entry.peer_id, raw_bytes.to_vec())
             {
-                let entry = proposer_entry.as_ref().unwrap();
-                match self.dispatcher.forward_direct(entry.peer_id, raw_bytes.to_vec()) {
-                    DispatchOutcome::DirectQueued => {
-                        TxRoutingMetrics::inc_forward_decision();
-                        crate::observability::PipelineObsMetrics::inc_router_forward();
-                        crate::observability::PipelineObsMetrics::inc_router_forward_direct_ok();
-                        debug!(
-                            target_group = %target_group,
-                            peer = %entry.peer_id,
-                            tx_hash = %hex::encode(&tx_hash[..8]),
-                            "TxRouter: forwarded cross-group TX via direct send"
-                        );
-                        return TxRouteDecision::Forwarded { tx_hash };
-                    }
-                    DispatchOutcome::DirectChannelUnavailable { reason: _ } => {
-                        // Fall through to gossip (counter already bumped).
-                        crate::observability::PipelineObsMetrics::inc_router_forward_direct_fail();
-                        true
-                    }
+                DispatchOutcome::DirectQueued => {
+                    TxRoutingMetrics::inc_forward_decision();
+                    crate::observability::PipelineObsMetrics::inc_router_forward();
+                    crate::observability::PipelineObsMetrics::inc_router_forward_direct_ok();
+                    debug!(
+                        target_group = %target_group,
+                        peer = %entry.peer_id,
+                        tx_hash = %hex::encode(&tx_hash[..8]),
+                        "TxRouter: forwarded cross-group TX via direct send"
+                    );
+                    return TxRouteDecision::Forwarded { tx_hash };
                 }
-            } else {
-                if proposer_entry.is_none() {
-                    // Fire-and-forget Kad refresh so future routes may hit.
-                    let cache = self.proposer_cache.clone();
-                    let group = target_group.clone();
-                    tokio::spawn(async move { cache.refresh_async(&group).await; });
+                DispatchOutcome::DirectChannelUnavailable { reason: _ } => {
+                    // Fall through to gossip (counter already bumped).
+                    crate::observability::PipelineObsMetrics::inc_router_forward_direct_fail();
+                    true
                 }
-                false
-            };
+            }
+        } else {
+            if proposer_entry.is_none() {
+                // Fire-and-forget Kad refresh so future routes may hit.
+                let cache = self.proposer_cache.clone();
+                let group = target_group.clone();
+                tokio::spawn(async move {
+                    cache.refresh_async(&group).await;
+                });
+            }
+            false
+        };
         let _ = direct_attempted;
 
         // Legacy default path: best-effort forward via gossipsub fan-out.

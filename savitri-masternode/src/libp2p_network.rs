@@ -1446,22 +1446,22 @@ impl Libp2pNetwork {
         let gossipsub = libp2p::gossipsub::Behaviour::new(
             libp2p::gossipsub::MessageAuthenticity::Signed(keypair.clone()),
             libp2p::gossipsub::ConfigBuilder::default()
-                .heartbeat_interval(std::time::Duration::from_millis(7000))   // 7s: ottimizzato per testnet 120 nodi
-                .validation_mode(libp2p::gossipsub::ValidationMode::Permissive)   // Permissive accepts messages whose signature could not be verified; switch to Strict for stronger validation if all peers sign reliably.
+                .heartbeat_interval(std::time::Duration::from_millis(7000)) // 7s: ottimizzato per testnet 120 nodi
+                .validation_mode(libp2p::gossipsub::ValidationMode::Permissive) // Permissive accepts messages whose signature could not be verified; switch to Strict for stronger validation if all peers sign reliably.
                 // ROUND 8: Scaled for 25-30 node networks (20 LN + 5 MN + TX gen)
-                .mesh_n(12)           // Target 12 peer (was 8) — covers ~50% of network
-                .mesh_n_low(6)        // Min 6 peer (was 4) — ensures quorum connectivity
-                .mesh_n_high(18)      // Max 18 peer (was 12) — room for full network
+                .mesh_n(12) // Target 12 peer (was 8) — covers ~50% of network
+                .mesh_n_low(6) // Min 6 peer (was 4) — ensures quorum connectivity
+                .mesh_n_high(18) // Max 18 peer (was 12) — room for full network
                 .mesh_outbound_min(4) // Min 4 outbound (was 3)
-                .history_gossip(5)    // Aumentato per più gossip history (da 2)
-                .history_length(10)   // Aumentato per buffer più grande (da 3)
-                .graft_flood_threshold(std::time::Duration::from_millis(500))  // CRITICAL FIX: Ridotto a 500ms
-                .prune_peers(10)      // Prune after 10 heartbeats without messages (70s with 7s heartbeat)
-                                      // NOTE: During bootstrap, mesh warmup keepalive prevents premature pruning
-                                      // flood_publish(true) ensures messages reach all peers even if mesh is small
-                .duplicate_cache_time(std::time::Duration::from_secs(60))   // 60s: cache più lunga per reti grandi (da 500ms)
-                .max_transmit_size(4_194_304)   // 4MB per message (supports blocks with 2000+ TXs in JSON serialization)
-                .flood_publish(true)  // CRITICAL FIX: Enable flood publishing to solve InsufficientPeers
+                .history_gossip(5) // Aumentato per più gossip history (da 2)
+                .history_length(10) // Aumentato per buffer più grande (da 3)
+                .graft_flood_threshold(std::time::Duration::from_millis(500)) // CRITICAL FIX: Ridotto a 500ms
+                .prune_peers(10) // Prune after 10 heartbeats without messages (70s with 7s heartbeat)
+                // NOTE: During bootstrap, mesh warmup keepalive prevents premature pruning
+                // flood_publish(true) ensures messages reach all peers even if mesh is small
+                .duplicate_cache_time(std::time::Duration::from_secs(60)) // 60s: cache più lunga per reti grandi (da 500ms)
+                .max_transmit_size(4_194_304) // 4MB per message (supports blocks with 2000+ TXs in JSON serialization)
+                .flood_publish(true) // CRITICAL FIX: Enable flood publishing to solve InsufficientPeers
                 // ROUND 7: Increased from 25K to 50K (matching LN)
                 .connection_handler_queue_len(50000)
                 .message_id_fn(|message| {

@@ -402,7 +402,6 @@ impl BlockValidator {
             // Check transaction nonce (would require account state)
             // Check transaction fee (would require gas calculation)
             // Check transaction signature (would require cryptography)
-
         }
 
         Ok(())

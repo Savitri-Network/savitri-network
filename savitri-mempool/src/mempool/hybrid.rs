@@ -1233,7 +1233,6 @@ impl HybridMempoolPipeline {
         signed_txs: &[SignedTx],
         _storage: &Storage,
     ) -> (Vec<SignedTx>, Vec<TxHandle>) {
-
         let mut valid_txs = Vec::new();
         let mut invalid_handles = Vec::new();
 

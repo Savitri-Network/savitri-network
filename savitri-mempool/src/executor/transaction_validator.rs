@@ -113,17 +113,26 @@ impl From<&str> for ValidationError {
 pub enum ValidationResult {
     Valid,
     /// Nonce non valido (troppo basso o già used)
-    InvalidNonce { expected: u64, actual: u64 },
+    InvalidNonce {
+        expected: u64,
+        actual: u64,
+    },
     InvalidSignature(String),
     /// Balance insufficient per la transazione
-    InsufficientBalance { required: u128, available: u128 },
+    InsufficientBalance {
+        required: u128,
+        available: u128,
+    },
     /// Transazione già eseguita (replay attack)
     ReplayAttack {
         tx_hash: [u8; 32],
         block_height: u64,
     },
     /// Fee troppo bassa rispetto ai limiti
-    FeeTooLow { required: u64, actual: u64 },
+    FeeTooLow {
+        required: u64,
+        actual: u64,
+    },
 }
 
 #[derive(Debug, thiserror::Error)]

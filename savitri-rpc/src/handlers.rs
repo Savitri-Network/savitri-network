@@ -585,7 +585,9 @@ pub fn get_block_height(state: &RpcState) -> Result<u64, RpcError> {
 /// Bounded scan: caps at MAX_KEYS to prevent unbounded RPC cost. With the
 /// current testnet (height ~4000 × 3 groups = ~12k entries) the cap is
 /// generous; bump or paginate if a real chain ever exceeds it.
-pub fn get_group_heights(state: &RpcState) -> Result<std::collections::BTreeMap<String, u64>, RpcError> {
+pub fn get_group_heights(
+    state: &RpcState,
+) -> Result<std::collections::BTreeMap<String, u64>, RpcError> {
     const MAX_KEYS: usize = 200_000;
     let storage = state.storage.as_ref().ok_or(RpcError::StorageUnavailable)?;
 
@@ -1433,7 +1435,11 @@ pub async fn send_raw_transaction(state: &RpcState, raw_tx_hex: &str) -> Result<
             crate::TxRouteDecision::Local | crate::TxRouteDecision::FallbackLocal => {
                 // fall through to normal local-admit path
             }
-            crate::TxRouteDecision::RetryGossipUnavailable { tx_hash, local_group_id, reason } => {
+            crate::TxRouteDecision::RetryGossipUnavailable {
+                tx_hash,
+                local_group_id,
+                reason,
+            } => {
                 // mempool but intra-group gossip publish failed, so the
                 // group's elected proposer (a different peer) would never
                 // receive it. Surface as retryable error rather than admit

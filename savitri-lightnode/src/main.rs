@@ -408,19 +408,19 @@ async fn run_main() -> Result<()> {
 
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         tracing_subscriber::EnvFilter::new("info")
-                // Hide libp2p dial retry warnings (they are normal during network startup)
-                .add_directive("libp2p::swarm::dial=warn".parse().unwrap())
-                .add_directive("libp2p::swarm::connection=warn".parse().unwrap())
-                .add_directive("libp2p::identify=warn".parse().unwrap())
-                // Hide specific libp2p warnings that are informational
-                .add_directive("swarm=warn".parse().unwrap())
-                .add_directive("noise=warn".parse().unwrap())
-                .add_directive("yamux=warn".parse().unwrap())
-                // ROUND 7: Suppress "Send Queue full" warnings from libp2p_gossipsub.
-                // These log the ENTIRE failed message payload (~1-2KB each), causing
-                // 120MB+ log files (56K+ warnings in 6 minutes). The queue saturation
-                // is handled by SlowPeer disconnect; the verbose logging is noise.
-                .add_directive("libp2p_gossipsub::behaviour=error".parse().unwrap())
+            // Hide libp2p dial retry warnings (they are normal during network startup)
+            .add_directive("libp2p::swarm::dial=warn".parse().unwrap())
+            .add_directive("libp2p::swarm::connection=warn".parse().unwrap())
+            .add_directive("libp2p::identify=warn".parse().unwrap())
+            // Hide specific libp2p warnings that are informational
+            .add_directive("swarm=warn".parse().unwrap())
+            .add_directive("noise=warn".parse().unwrap())
+            .add_directive("yamux=warn".parse().unwrap())
+            // ROUND 7: Suppress "Send Queue full" warnings from libp2p_gossipsub.
+            // These log the ENTIRE failed message payload (~1-2KB each), causing
+            // 120MB+ log files (56K+ warnings in 6 minutes). The queue saturation
+            // is handled by SlowPeer disconnect; the verbose logging is noise.
+            .add_directive("libp2p_gossipsub::behaviour=error".parse().unwrap())
     });
     tracing_subscriber::fmt()
         .with_env_filter(env_filter)
@@ -797,18 +797,20 @@ async fn run_main() -> Result<()> {
             .and_then(|s| s.parse::<u64>().ok())
             .filter(|&v| v > 0)
             .or_else(|| cfg_ref.and_then(|c| c.genesis_timestamp_ms)),
-        resources: file_cfg.as_ref().and_then(|cfg| cfg.resources.clone().map(|r| config::ResourceConfig {
-            bandwidth_mbps: r.bandwidth_mbps,
-            cpu_cores: r.cpu_cores,
-            storage_gb: r.storage_gb,
-            epoch_secs: r.epoch_secs,
-            tolerance: r.tolerance,
-            weights: config::ResourceWeights {
-                bandwidth: r.weights.bandwidth,
-                cpu: r.weights.cpu,
-                storage: r.weights.storage,
-            },
-        })),
+        resources: file_cfg.as_ref().and_then(|cfg| {
+            cfg.resources.clone().map(|r| config::ResourceConfig {
+                bandwidth_mbps: r.bandwidth_mbps,
+                cpu_cores: r.cpu_cores,
+                storage_gb: r.storage_gb,
+                epoch_secs: r.epoch_secs,
+                tolerance: r.tolerance,
+                weights: config::ResourceWeights {
+                    bandwidth: r.weights.bandwidth,
+                    cpu: r.weights.cpu,
+                    storage: r.weights.storage,
+                },
+            })
+        }),
         memory_only: file_cfg.as_ref().and_then(|c| c.memory_only),
         db_path: file_cfg.as_ref().and_then(|c| c.db_path.clone()),
         rpc_enabled: file_cfg.as_ref().and_then(|c| c.rpc_enabled),
@@ -1085,12 +1087,19 @@ async fn run_main() -> Result<()> {
                 let s = crate::observability::PipelineObsMetrics::snapshot();
                 tracing::warn!(
                     routes = s[0],
-                    local = s[1], local_no_grp = s[2],
-                    forward = s[3], retry = s[4], fallback = s[5],
-                    fwd_direct_ok = s[6], fwd_direct_fail = s[7],
-                    fwd_gossip_ok = s[8], fwd_gossip_fail = s[9],
-                    gossip_rx = s[10], gossip_decoded = s[11],
-                    gossip_decode_fail = s[12], gossip_fwd_mempool = s[13],
+                    local = s[1],
+                    local_no_grp = s[2],
+                    forward = s[3],
+                    retry = s[4],
+                    fallback = s[5],
+                    fwd_direct_ok = s[6],
+                    fwd_direct_fail = s[7],
+                    fwd_gossip_ok = s[8],
+                    fwd_gossip_fail = s[9],
+                    gossip_rx = s[10],
+                    gossip_decoded = s[11],
+                    gossip_decode_fail = s[12],
+                    gossip_fwd_mempool = s[13],
                     blocks_proposed = s[14],
                     blocks_throttled_density = s[15],
                     blocks_heartbeat = s[16],
@@ -1112,14 +1121,29 @@ async fn run_main() -> Result<()> {
             tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 tick.tick().await;
-                let (main_total, rv_len, sum_queue, non_empty,
-                     queued_total, queued_accounts, queued_promoted,
-                     queued_expired, queued_rej_full, queued_rej_gap) =
-                    pipeline_for_diag.diag_full_state();
+                let (
+                    main_total,
+                    rv_len,
+                    sum_queue,
+                    non_empty,
+                    queued_total,
+                    queued_accounts,
+                    queued_promoted,
+                    queued_expired,
+                    queued_rej_full,
+                    queued_rej_gap,
+                ) = pipeline_for_diag.diag_full_state();
                 tracing::warn!(
-                    main_total, rv_len, sum_queue, non_empty,
-                    queued_total, queued_accounts, queued_promoted,
-                    queued_expired, queued_rej_full, queued_rej_gap,
+                    main_total,
+                    rv_len,
+                    sum_queue,
+                    non_empty,
+                    queued_total,
+                    queued_accounts,
+                    queued_promoted,
+                    queued_expired,
+                    queued_rej_full,
+                    queued_rej_gap,
                     "DIAG[mempool-zero]: 10s snapshot"
                 );
             }
@@ -1129,7 +1153,7 @@ async fn run_main() -> Result<()> {
     let is_intragroup_proposer = Arc::new(tokio::sync::RwLock::new(false));
     // When true, this node is in an intra-group: only the elected proposer should drain mempool; main block producer must not drain.
     let is_in_intra_group = Arc::new(tokio::sync::RwLock::new(false));
-    
+
     // between the network task (writer — populates from GroupAnnouncement
     // gossip) and the tx_router (reader — consults at route() time for
     // cache internally and the network task had no handle to it, so
@@ -1155,7 +1179,8 @@ async fn run_main() -> Result<()> {
         Some(is_in_intra_group.clone()),
         Some(Arc::clone(&pou_observations)),
         Some(proposer_cache_shared.clone()),
-    ).await?;
+    )
+    .await?;
 
     #[cfg(not(feature = "rpc"))]
     {
@@ -1320,8 +1345,11 @@ async fn run_main() -> Result<()> {
             // so route() returns Local and this path is zero-overhead.
             let tx_router: Arc<dyn savitri_rpc::TxRouter> = {
                 let gm_for_closure = network.group_manager.clone();
-                let local_group_fn: crate::tx_router::LocalGroupFn =
-                    Arc::new(move || gm_for_closure.get_current_group_cached().map(|g| g.group_id.clone()));
+                let local_group_fn: crate::tx_router::LocalGroupFn = Arc::new(move || {
+                    gm_for_closure
+                        .get_current_group_cached()
+                        .map(|g| g.group_id.clone())
+                });
                 // the SAME ProposerCache instance the network task populates.
                 let cache_with_swarm = proposer_cache_shared
                     .clone()

@@ -1,4 +1,3 @@
-
 use crate::oracle::types::OracleError;
 use hex;
 use serde::{Deserialize, Serialize};

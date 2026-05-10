@@ -27,14 +27,20 @@ pub enum OracleError {
         tolerance: u64,
     },
     /// Sequence/nonce già utilizzato (replay attack)
-    ReplayAttack { feed_id: String, sequence: u64 },
+    ReplayAttack {
+        feed_id: String,
+        sequence: u64,
+    },
     /// Permesso negato (ACL)
     PermissionDenied {
         address: Vec<u8>,
         role: OracleRole,
         action: String,
     },
-    SchemaValidationFailed { schema_id: String, reason: String },
+    SchemaValidationFailed {
+        schema_id: String,
+        reason: String,
+    },
     /// Encoding non canonico
     NonCanonicalEncoding(String),
     InvalidConfig(String),

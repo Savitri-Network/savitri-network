@@ -1689,7 +1689,11 @@ impl IntraGroupCommunication {
                     .ok()
                     .and_then(|v| v.parse::<usize>().ok())
                     .unwrap_or(0);
-                let block_threshold: usize = if min_tx_per_block > 0 { min_tx_per_block } else { 1 };
+                let block_threshold: usize = if min_tx_per_block > 0 {
+                    min_tx_per_block
+                } else {
+                    1
+                };
                 let mut consecutive_empty_ticks: u32 = 0;
                 loop {
                     tokio::time::sleep(Duration::from_millis(adaptive_sleep_ms)).await;
@@ -1711,25 +1715,35 @@ impl IntraGroupCommunication {
                     }
                     let next_height = std::cmp::max(finalized_height + 1, last_proposed_height + 1);
                     // Minimum wait: skip if mempool empty.
-                    let mempool_len = if let Some(ref pipeline) = intra_group_comm_clone.mempool_pipeline {
-                        pipeline.len_async().await
-                    } else { 0 };
+                    let mempool_len =
+                        if let Some(ref pipeline) = intra_group_comm_clone.mempool_pipeline {
+                            pipeline.len_async().await
+                        } else {
+                            0
+                        };
                     // self-delivery loop below for full rationale.
                     if mempool_len < block_threshold {
                         crate::observability::PipelineObsMetrics::inc_block_throttled_density();
                         consecutive_empty_ticks += 1;
                         adaptive_sleep_ms = 1000;
-                        if consecutive_empty_ticks < max_empty_ticks { continue; }
+                        if consecutive_empty_ticks < max_empty_ticks {
+                            continue;
+                        }
                         let skip_empty: bool = std::env::var("SAVITRI_SKIP_EMPTY_BLOCKS")
                             .ok()
                             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
                             .unwrap_or(false);
                         if skip_empty {
-                            let heartbeat_ticks: u32 = std::env::var("SAVITRI_EMPTY_HEARTBEAT_TICKS")
-                                .ok().and_then(|v| v.parse::<u32>().ok())
-                                .filter(|&v| v > 0).unwrap_or(60);
+                            let heartbeat_ticks: u32 =
+                                std::env::var("SAVITRI_EMPTY_HEARTBEAT_TICKS")
+                                    .ok()
+                                    .and_then(|v| v.parse::<u32>().ok())
+                                    .filter(|&v| v > 0)
+                                    .unwrap_or(60);
                             let after_max = consecutive_empty_ticks.saturating_sub(max_empty_ticks);
-                            if after_max % heartbeat_ticks != 0 { continue; }
+                            if after_max % heartbeat_ticks != 0 {
+                                continue;
+                            }
                         }
                     }
                     consecutive_empty_ticks = 0;
@@ -1741,11 +1755,19 @@ impl IntraGroupCommunication {
                         500
                     };
                     last_proposed_height = next_height;
-                    tracing::info!(round, height = next_height, finalized = finalized_height,
-                        depth = next_height - finalized_height, mempool = mempool_len,
-                        "PIPELINE(single): proposing block");
+                    tracing::info!(
+                        round,
+                        height = next_height,
+                        finalized = finalized_height,
+                        depth = next_height - finalized_height,
+                        mempool = mempool_len,
+                        "PIPELINE(single): proposing block"
+                    );
                     crate::observability::PipelineObsMetrics::inc_block_proposed();
-                    if let Err(e) = intra_group_comm_clone.create_and_propose_block_at_height(round, Some(next_height)).await {
+                    if let Err(e) = intra_group_comm_clone
+                        .create_and_propose_block_at_height(round, Some(next_height))
+                        .await
+                    {
                         error!("Failed to create and propose block: {}", e);
                     }
                 }
@@ -1866,8 +1888,8 @@ impl IntraGroupCommunication {
         // (uptime, latency, integrity), the lex-low bias should diminish
         // organically once scores diverge.
         candidates.sort_by(|a, b| {
-            b.2.cmp(&a.2)                        // Primary: pou_score (u32) descending
-                .then_with(|| a.0.cmp(&b.0))     // Tiebreaker: peer_id ascending (stable cross-node)
+            b.2.cmp(&a.2) // Primary: pou_score (u32) descending
+                .then_with(|| a.0.cmp(&b.0)) // Tiebreaker: peer_id ascending (stable cross-node)
         });
         // Require a majority of candidates before broadcasting a result.
         // With too few candidates, each node has a different subset and may elect
@@ -2024,11 +2046,12 @@ impl IntraGroupCommunication {
                         let mut rotation_needed = false;
                         let mut last_proposed_height: u64 = 0;
                         // loop above for rationale. Same env override.
-                        let max_pipeline_depth: u64 = std::env::var("SAVITRI_PROPOSER_PIPELINE_DEPTH")
-                            .ok()
-                            .and_then(|v| v.parse::<u64>().ok())
-                            .filter(|&d| d > 0)
-                            .unwrap_or(64);
+                        let max_pipeline_depth: u64 =
+                            std::env::var("SAVITRI_PROPOSER_PIPELINE_DEPTH")
+                                .ok()
+                                .and_then(|v| v.parse::<u64>().ok())
+                                .filter(|&d| d > 0)
+                                .unwrap_or(64);
                         // values trade block rate for block density: with 245 TPS
                         // submit / 3 groups, the proposer's mempool can stay empty
                         // for 1-3 s between drains (gossip RX is bursty), so a
@@ -2057,7 +2080,11 @@ impl IntraGroupCommunication {
                             .ok()
                             .and_then(|v| v.parse::<usize>().ok())
                             .unwrap_or(0);
-                        let block_threshold: usize = if min_tx_per_block > 0 { min_tx_per_block } else { 1 };
+                        let block_threshold: usize = if min_tx_per_block > 0 {
+                            min_tx_per_block
+                        } else {
+                            1
+                        };
                         let mut consecutive_empty_ticks: u32 = 0;
                         loop {
                             tokio::time::sleep(Duration::from_millis(adaptive_sleep_ms)).await;
@@ -2081,8 +2108,10 @@ impl IntraGroupCommunication {
                                 break;
                             }
                             // PIPELINING: Allow proposing ahead of finalized height
-                            let finalized_height = intra_group_comm_clone.get_current_block_height().await;
-                            let pipeline_ahead = last_proposed_height.saturating_sub(finalized_height);
+                            let finalized_height =
+                                intra_group_comm_clone.get_current_block_height().await;
+                            let pipeline_ahead =
+                                last_proposed_height.saturating_sub(finalized_height);
                             if pipeline_ahead >= max_pipeline_depth {
                                 continue; // Pipeline full, wait for MN finalization
                             }
@@ -2093,7 +2122,9 @@ impl IntraGroupCommunication {
                                 intra_group_comm_clone.mempool_pipeline
                             {
                                 pipeline.len_async().await
-                            } else { 0 };
+                            } else {
+                                0
+                            };
                             // max_empty_ticks expired, would propose an empty
                             // block on every subsequent tick (1 empty/sec).
                             // blocks across the cluster (memory:
@@ -2111,18 +2142,22 @@ impl IntraGroupCommunication {
                             if mempool_len < block_threshold {
                                 consecutive_empty_ticks += 1;
                                 adaptive_sleep_ms = 1000;
-                                if consecutive_empty_ticks < max_empty_ticks { continue; }
+                                if consecutive_empty_ticks < max_empty_ticks {
+                                    continue;
+                                }
                                 let skip_empty: bool = std::env::var("SAVITRI_SKIP_EMPTY_BLOCKS")
                                     .ok()
                                     .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
                                     .unwrap_or(false);
                                 if skip_empty {
-                                    let heartbeat_ticks: u32 = std::env::var("SAVITRI_EMPTY_HEARTBEAT_TICKS")
-                                        .ok()
-                                        .and_then(|v| v.parse::<u32>().ok())
-                                        .filter(|&v| v > 0)
-                                        .unwrap_or(60);
-                                    let after_max = consecutive_empty_ticks.saturating_sub(max_empty_ticks);
+                                    let heartbeat_ticks: u32 =
+                                        std::env::var("SAVITRI_EMPTY_HEARTBEAT_TICKS")
+                                            .ok()
+                                            .and_then(|v| v.parse::<u32>().ok())
+                                            .filter(|&v| v > 0)
+                                            .unwrap_or(60);
+                                    let after_max =
+                                        consecutive_empty_ticks.saturating_sub(max_empty_ticks);
                                     if after_max % heartbeat_ticks != 0 {
                                         continue; // skip empty block until heartbeat boundary
                                     }
@@ -3005,7 +3040,11 @@ impl IntraGroupCommunication {
                 .ok()
                 .and_then(|v| v.parse::<usize>().ok())
                 .unwrap_or(0);
-            let block_threshold: usize = if min_tx_per_block > 0 { min_tx_per_block } else { 1 };
+            let block_threshold: usize = if min_tx_per_block > 0 {
+                min_tx_per_block
+            } else {
+                1
+            };
             loop {
                 tokio::time::sleep(Duration::from_millis(adaptive_sleep_ms)).await;
                 let round = {
@@ -3117,11 +3156,12 @@ impl IntraGroupCommunication {
                 // Minimum wait: check mempool before producing a block.
                 // If mempool is empty, skip and wait for TX to arrive.
                 // After MAX_EMPTY_TICKS (5s) produce a heartbeat block.
-                let mempool_len = if let Some(ref pipeline) = intra_group_comm_clone.mempool_pipeline {
-                    pipeline.len_async().await
-                } else {
-                    0
-                };
+                let mempool_len =
+                    if let Some(ref pipeline) = intra_group_comm_clone.mempool_pipeline {
+                        pipeline.len_async().await
+                    } else {
+                        0
+                    };
                 // self-delivery loop for full rationale.
                 if mempool_len < block_threshold {
                     consecutive_empty_ticks += 1;
@@ -3142,8 +3182,10 @@ impl IntraGroupCommunication {
                         .unwrap_or(false);
                     if skip_empty {
                         let heartbeat_ticks: u32 = std::env::var("SAVITRI_EMPTY_HEARTBEAT_TICKS")
-                            .ok().and_then(|v| v.parse::<u32>().ok())
-                            .filter(|&v| v > 0).unwrap_or(60);
+                            .ok()
+                            .and_then(|v| v.parse::<u32>().ok())
+                            .filter(|&v| v > 0)
+                            .unwrap_or(60);
                         let after_max = consecutive_empty_ticks.saturating_sub(max_empty_ticks);
                         if after_max % heartbeat_ticks != 0 {
                             continue; // skip empty block until heartbeat boundary
@@ -3179,7 +3221,10 @@ impl IntraGroupCommunication {
                     next_height - finalized_height
                 );
                 crate::observability::PipelineObsMetrics::inc_block_proposed();
-                if let Err(e) = intra_group_comm_clone.create_and_propose_block_at_height(round, Some(next_height)).await {
+                if let Err(e) = intra_group_comm_clone
+                    .create_and_propose_block_at_height(round, Some(next_height))
+                    .await
+                {
                     error!("Failed to create and propose block: {}", e);
                 }
             }
@@ -3951,7 +3996,8 @@ impl IntraGroupCommunication {
         if is_legacy_single_group {
             // Single-group lane: update global for backward compat with the
             // legacy chain head (CF_METADATA[chain_head], non-per-group).
-            self.last_certified_height.fetch_max(height, AtomicOrdering::SeqCst);
+            self.last_certified_height
+                .fetch_max(height, AtomicOrdering::SeqCst);
         }
         // Always update the per-group map.
         if let Ok(mut map) = self.last_certified_height_per_group.write() {
@@ -4069,7 +4115,8 @@ impl IntraGroupCommunication {
         }
 
         // Calculate latency statistics
-        let mut rtt_values: Vec<f64> = latencies.values()
+        let mut rtt_values: Vec<f64> = latencies
+            .values()
             .map(|(d, _)| d.as_secs_f64() * 1000.0) // Convert to milliseconds
             .collect();
         rtt_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));

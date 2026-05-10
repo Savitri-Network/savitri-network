@@ -106,7 +106,7 @@ pub struct ValidationRequirements {
     pub enable_parallel_validation: bool,
 
     pub enable_dag_validation: bool, // Default: false
-    pub max_dag_branches: usize, // Default: 50
+    pub max_dag_branches: usize,     // Default: 50
     /// Timeout for DAG conflict resolution
     pub conflict_resolution_timeout_ms: u64, // Default: 500
 }

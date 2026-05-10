@@ -1288,8 +1288,7 @@ pub async fn start_network(
         // re-registration on epoch boundary so the MN re-issues a fresh
         // group_id for the new epoch instead of leaving the LN stuck with
         // its boot-time group_id.
-        let mut registration_rebroadcast_timer =
-            tokio::time::interval(Duration::from_secs(30));
+        let mut registration_rebroadcast_timer = tokio::time::interval(Duration::from_secs(30));
         registration_rebroadcast_timer
             .set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 

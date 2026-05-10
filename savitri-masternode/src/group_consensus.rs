@@ -1180,7 +1180,9 @@ impl GroupConsensusManager {
             "Adding {} groups to active groups (status flipped to Active by BFT approval)",
             approved_groups.len()
         );
-        self.group_manager.add_active_groups(&approved_groups).await?;
+        self.group_manager
+            .add_active_groups(&approved_groups)
+            .await?;
         info!("✅ Groups added to active groups");
 
         // CRITICAL: Distribute approved groups to lightnodes

@@ -338,7 +338,11 @@ impl AdmissionControl {
     /// or `AdmissionResult::Rejected` if invalid.
     ///
     /// The legacy `check_admission` method (returning bool) delegates here.
-    pub fn check_admission_ext(&mut self, pv: &PrevalidatedTx, tx_hash: Option<[u8; 32]>) -> AdmissionResult {
+    pub fn check_admission_ext(
+        &mut self,
+        pv: &PrevalidatedTx,
+        tx_hash: Option<[u8; 32]>,
+    ) -> AdmissionResult {
         self.check_admission_ext_with_source(pv, tx_hash, false)
     }
 
@@ -349,7 +353,12 @@ impl AdmissionControl {
     /// "Queued"). With from_rpc=true we admit the TX into the main pool with an
     /// effective account.nonce=0 — matching the genesis-account semantics — so
     /// the proposer can include it in the next block.
-    pub fn check_admission_ext_with_source(&mut self, pv: &PrevalidatedTx, tx_hash: Option<[u8; 32]>, from_rpc: bool) -> AdmissionResult {
+    pub fn check_admission_ext_with_source(
+        &mut self,
+        pv: &PrevalidatedTx,
+        tx_hash: Option<[u8; 32]>,
+        from_rpc: bool,
+    ) -> AdmissionResult {
         // with this exact (sender, nonce) pair. Two paths routinely produce
         // duplicates: (1) RPC retry from a client that didn't see the ACK,
         // (2) gossip re-broadcast of a TX we also received via RPC.
@@ -368,9 +377,10 @@ impl AdmissionControl {
         }
         if let Some(map) = self.admitted_nonces.get(&pv.sender_id) {
             if map.contains_key(&pv.nonce) {
-                return AdmissionResult::Rejected(
-                    format!("duplicate (sender_id={}, nonce={}) already admitted", pv.sender_id, pv.nonce)
-                );
+                return AdmissionResult::Rejected(format!(
+                    "duplicate (sender_id={}, nonce={}) already admitted",
+                    pv.sender_id, pv.nonce
+                ));
             }
         }
 
@@ -519,7 +529,12 @@ impl AdmissionControl {
                         if pv.nonce > ADMISSION_MAX_MAIN_POOL_NONCE_GAP_RPC {
                             match self.queued_pool.try_queue(pv.clone(), tx_hash, 0) {
                                 Ok(()) => return AdmissionResult::Queued,
-                                Err(e) => return AdmissionResult::Rejected(format!("queued pool (rpc, no acct): {}", e)),
+                                Err(e) => {
+                                    return AdmissionResult::Rejected(format!(
+                                        "queued pool (rpc, no acct): {}",
+                                        e
+                                    ))
+                                }
                             }
                         }
                         // Skip the balance check — the prefund/funding pipeline will
@@ -527,30 +542,30 @@ impl AdmissionControl {
                         // a possible execution-time reject for unblocking sustained
                         // throughput on RPC-accepted TXs.
                     } else {
-                    // Gossip path or untrusted source: route ALL TXs to queued_pool
-                    // (waiting for funding commit). Original behaviour preserved.
-                    match self.queued_pool.try_queue(pv.clone(), tx_hash, 0) {
-                        Ok(()) => {
-                            tracing::info!(
-                                sender_address = %hex::encode(&pv.sender_address[..8]),
-                                tx_nonce = pv.nonce,
-                                "Transaction queued for new account (waiting for account creation)"
-                            );
-                            return AdmissionResult::Queued;
+                        // Gossip path or untrusted source: route ALL TXs to queued_pool
+                        // (waiting for funding commit). Original behaviour preserved.
+                        match self.queued_pool.try_queue(pv.clone(), tx_hash, 0) {
+                            Ok(()) => {
+                                tracing::info!(
+                                    sender_address = %hex::encode(&pv.sender_address[..8]),
+                                    tx_nonce = pv.nonce,
+                                    "Transaction queued for new account (waiting for account creation)"
+                                );
+                                return AdmissionResult::Queued;
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    sender_address = %hex::encode(&pv.sender_address[..8]),
+                                    tx_nonce = pv.nonce,
+                                    error = %e,
+                                    "Admission rejected: new account, could not queue"
+                                );
+                                return AdmissionResult::Rejected(format!(
+                                    "new account queued pool: {}",
+                                    e
+                                ));
+                            }
                         }
-                        Err(e) => {
-                            tracing::warn!(
-                                sender_address = %hex::encode(&pv.sender_address[..8]),
-                                tx_nonce = pv.nonce,
-                                error = %e,
-                                "Admission rejected: new account, could not queue"
-                            );
-                            return AdmissionResult::Rejected(format!(
-                                "new account queued pool: {}",
-                                e
-                            ));
-                        }
-                    }
                     } // end else gossip branch
                 }
                 Err(e) => {
@@ -565,7 +580,8 @@ impl AdmissionControl {
 
         // 2. Duplicate transaction check (CRITICAL for consensus integrity)
         if let Some(hash) = tx_hash {
-            if let Some((existing_sender, existing_nonce, _ts)) = self.seen_transactions.get(&hash) {
+            if let Some((existing_sender, existing_nonce, _ts)) = self.seen_transactions.get(&hash)
+            {
                 if *existing_sender == pv.sender_id && *existing_nonce == pv.nonce {
                     tracing::warn!(
                         tx_hash = %hex::encode(&hash[..8]),
@@ -696,7 +712,10 @@ impl AdmissionControl {
     /// Backward-compatible admission check (returns bool).
     /// Returns true only for `Admitted` (not for `Queued`).
     pub fn check_admission(&mut self, pv: &PrevalidatedTx, tx_hash: Option<[u8; 32]>) -> bool {
-        matches!(self.check_admission_ext(pv, tx_hash), AdmissionResult::Admitted)
+        matches!(
+            self.check_admission_ext(pv, tx_hash),
+            AdmissionResult::Admitted
+        )
     }
 
     /// Evict entries from `seen_transactions` and `admitted_nonces` whose
@@ -787,12 +806,16 @@ impl AdmissionControl {
                     self.seen_transactions.remove(&k);
                 }
             }
-            self.seen_transactions.insert(hash, (pv.sender_id, pv.nonce, now));
+            self.seen_transactions
+                .insert(hash, (pv.sender_id, pv.nonce, now));
         }
 
         // Track (sender, nonce) for dedup on later admission attempts.
         // See check_admission_ext header note on fix #a.
-        self.admitted_nonces.entry(pv.sender_id).or_default().insert(pv.nonce, now);
+        self.admitted_nonces
+            .entry(pv.sender_id)
+            .or_default()
+            .insert(pv.nonce, now);
 
         *self.sender_counts.entry(pv.sender_id).or_insert(0) += 1;
         *self.class_counts.entry(pv.class).or_insert(0) += 1;

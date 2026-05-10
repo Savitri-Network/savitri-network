@@ -216,15 +216,16 @@ impl ProposerPoolManager {
                 let mut sorted_txs: Vec<_> = pool.transactions.iter().collect();
                 sorted_txs.sort_by(|a, b| {
                     // First by priority
-                    b.priority.cmp(&a.priority)
-                    // Then by fee if prioritization enabled
-                    .then_with(|| {
-                        if self.config.enable_fee_prioritization {
-                            b.transaction.fee.cmp(&a.transaction.fee)
-                        } else {
-                            std::cmp::Ordering::Equal
-                        }
-                    })
+                    b.priority
+                        .cmp(&a.priority)
+                        // Then by fee if prioritization enabled
+                        .then_with(|| {
+                            if self.config.enable_fee_prioritization {
+                                b.transaction.fee.cmp(&a.transaction.fee)
+                            } else {
+                                std::cmp::Ordering::Equal
+                            }
+                        })
                 });
 
                 let selected_txs: Vec<PrioritizedTransaction> = sorted_txs

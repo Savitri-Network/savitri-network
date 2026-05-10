@@ -127,8 +127,7 @@ impl Feed {
             std::str::from_utf8(key.as_bytes())
                 .map_err(|_| OracleError::NonCanonicalEncoding(format!("Invalid key: {}", key)))?;
 
-            if value.is_empty() && !key.is_empty() {
-            }
+            if value.is_empty() && !key.is_empty() {}
         }
         Ok(())
     }

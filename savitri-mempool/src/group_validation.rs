@@ -259,8 +259,7 @@ impl GroupTransactionValidator {
             stats.successful_validations += 1;
         } else {
             stats.failed_validations += 1;
-            for error in &validation_errors {
-            }
+            for error in &validation_errors {}
         }
 
         stats.average_validation_time_ms =

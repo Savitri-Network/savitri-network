@@ -132,7 +132,10 @@ fn rpc_error_to_response(id: Value, err: RpcError) -> JsonRpcResponse {
         RpcError::NotImplemented(msg) => (NOT_IMPLEMENTED, msg.clone()),
         RpcError::ServiceUnavailable(msg) => {
             tracing::warn!(detail = %msg, "RPC ServiceUnavailable (retryable)");
-            (SERVICE_UNAVAILABLE, "Service temporarily unavailable, retry".to_string())
+            (
+                SERVICE_UNAVAILABLE,
+                "Service temporarily unavailable, retry".to_string(),
+            )
         }
     };
     JsonRpcResponse::error(id, code, message, None)

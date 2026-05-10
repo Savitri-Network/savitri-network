@@ -912,9 +912,7 @@ impl VotingSystem {
                     proposal.status = match result {
                         ProposalStatus::Approved => StorageProposalStatus::Approved,
                         ProposalStatus::Rejected => StorageProposalStatus::Rejected,
-                        _ => {
-                            StorageProposalStatus::Rejected
-                        }
+                        _ => StorageProposalStatus::Rejected,
                     };
                     updated = true;
                     processed_count += 1;

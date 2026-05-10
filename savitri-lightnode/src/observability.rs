@@ -158,26 +158,80 @@ pub static BLOCK_PROD_PIPELINE_FULL: AtomicU64 = AtomicU64::new(0);
 pub struct PipelineObsMetrics;
 
 impl PipelineObsMetrics {
-    #[inline] pub fn inc_router_route() { ROUTER_ROUTES.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_local() { ROUTER_DECIDED_LOCAL.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_local_no_group() { ROUTER_DECIDED_LOCAL_NO_GROUP.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_forward() { ROUTER_DECIDED_FORWARD.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_retry() { ROUTER_DECIDED_RETRY.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_fallback() { ROUTER_DECIDED_FALLBACK.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_forward_direct_ok() { ROUTER_FORWARD_DIRECT_OK.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_forward_direct_fail() { ROUTER_FORWARD_DIRECT_FAIL.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_forward_gossip_ok() { ROUTER_FORWARD_GOSSIP_OK.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_router_forward_gossip_fail() { ROUTER_FORWARD_GOSSIP_FAIL.fetch_add(1, Ordering::Relaxed); }
+    #[inline]
+    pub fn inc_router_route() {
+        ROUTER_ROUTES.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_local() {
+        ROUTER_DECIDED_LOCAL.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_local_no_group() {
+        ROUTER_DECIDED_LOCAL_NO_GROUP.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_forward() {
+        ROUTER_DECIDED_FORWARD.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_retry() {
+        ROUTER_DECIDED_RETRY.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_fallback() {
+        ROUTER_DECIDED_FALLBACK.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_forward_direct_ok() {
+        ROUTER_FORWARD_DIRECT_OK.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_forward_direct_fail() {
+        ROUTER_FORWARD_DIRECT_FAIL.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_forward_gossip_ok() {
+        ROUTER_FORWARD_GOSSIP_OK.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_router_forward_gossip_fail() {
+        ROUTER_FORWARD_GOSSIP_FAIL.fetch_add(1, Ordering::Relaxed);
+    }
 
-    #[inline] pub fn inc_gossip_rx_received() { GOSSIP_RX_TX_RECEIVED.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_gossip_rx_decoded() { GOSSIP_RX_TX_DECODED.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_gossip_rx_decode_fail() { GOSSIP_RX_TX_DECODE_FAIL.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn add_gossip_rx_forwarded(n: u64) { GOSSIP_RX_TX_FORWARDED_TO_MEMPOOL.fetch_add(n, Ordering::Relaxed); }
+    #[inline]
+    pub fn inc_gossip_rx_received() {
+        GOSSIP_RX_TX_RECEIVED.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_gossip_rx_decoded() {
+        GOSSIP_RX_TX_DECODED.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_gossip_rx_decode_fail() {
+        GOSSIP_RX_TX_DECODE_FAIL.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn add_gossip_rx_forwarded(n: u64) {
+        GOSSIP_RX_TX_FORWARDED_TO_MEMPOOL.fetch_add(n, Ordering::Relaxed);
+    }
 
-    #[inline] pub fn inc_block_proposed() { BLOCK_PROD_PROPOSED.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_block_throttled_density() { BLOCK_PROD_THROTTLED_DENSITY.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_block_heartbeat() { BLOCK_PROD_HEARTBEAT_EMITTED.fetch_add(1, Ordering::Relaxed); }
-    #[inline] pub fn inc_block_pipeline_full() { BLOCK_PROD_PIPELINE_FULL.fetch_add(1, Ordering::Relaxed); }
+    #[inline]
+    pub fn inc_block_proposed() {
+        BLOCK_PROD_PROPOSED.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_block_throttled_density() {
+        BLOCK_PROD_THROTTLED_DENSITY.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_block_heartbeat() {
+        BLOCK_PROD_HEARTBEAT_EMITTED.fetch_add(1, Ordering::Relaxed);
+    }
+    #[inline]
+    pub fn inc_block_pipeline_full() {
+        BLOCK_PROD_PIPELINE_FULL.fetch_add(1, Ordering::Relaxed);
+    }
 
     /// Snapshot the entire pipeline. Order: router (route, local, local_no_group,
     /// forward, retry, fallback, direct_ok, direct_fail, gossip_ok, gossip_fail),

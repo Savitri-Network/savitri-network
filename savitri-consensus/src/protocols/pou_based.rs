@@ -282,7 +282,8 @@ impl PouBasedConsensus {
     /// Get top proposers by score
     pub async fn get_top_proposers(&self, count: usize) -> crate::Result<Vec<ProposerInfo>> {
         let validators = self.storage.get_active_validators().await?;
-        let mut proposers: Vec<_> = validators.into_iter()
+        let mut proposers: Vec<_> = validators
+            .into_iter()
             // SECURITY: Enforce both lower and upper bound on PoU scores (0–1000)
             .filter(|v| v.score >= self.config.min_proposer_score as u32 && v.score <= 1000)
             .map(|v| ProposerInfo {

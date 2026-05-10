@@ -134,7 +134,8 @@ pub fn build_tx_signable_v2(
     nonce: u64,
     fee: u128,
 ) -> Vec<u8> {
-    let mut msg = Vec::with_capacity(1 + 4 + from_hex_bytes.len() + to_hex_bytes.len() + 8 + 8 + 16);
+    let mut msg =
+        Vec::with_capacity(1 + 4 + from_hex_bytes.len() + to_hex_bytes.len() + 8 + 8 + 16);
     msg.push(TX_SIGNABLE_V2_TAG);
     msg.extend_from_slice(&chain_id.to_be_bytes());
     msg.extend_from_slice(from_hex_bytes);
@@ -185,7 +186,11 @@ mod tests_canonical_v2 {
         let digest = Sha256::digest(&signable);
         let sig = kp.sign(digest.as_slice());
         let pk_bytes: [u8; 32] = kp.verifying_key().to_bytes();
-        assert!(verify_tx_signature_v2(&signable, &sig.to_bytes(), &pk_bytes));
+        assert!(verify_tx_signature_v2(
+            &signable,
+            &sig.to_bytes(),
+            &pk_bytes
+        ));
     }
 
     #[test]
@@ -209,8 +214,10 @@ mod tests_canonical_v2 {
         let kp = Keypair::from_bytes(&[7u8; 32]);
         let from_hex = "cc".repeat(32);
         let to_hex = "dd".repeat(32);
-        let s_a = build_tx_signable_v2(1, from_hex.as_bytes(), to_hex.as_bytes(), 1u64, 0u64, 1u128);
-        let s_b = build_tx_signable_v2(2, from_hex.as_bytes(), to_hex.as_bytes(), 1u64, 0u64, 1u128);
+        let s_a =
+            build_tx_signable_v2(1, from_hex.as_bytes(), to_hex.as_bytes(), 1u64, 0u64, 1u128);
+        let s_b =
+            build_tx_signable_v2(2, from_hex.as_bytes(), to_hex.as_bytes(), 1u64, 0u64, 1u128);
         let sig_a = kp.sign(Sha256::digest(&s_a).as_slice());
         let pk_bytes: [u8; 32] = kp.verifying_key().to_bytes();
         assert!(verify_tx_signature_v2(&s_a, &sig_a.to_bytes(), &pk_bytes));
