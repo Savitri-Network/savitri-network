@@ -213,11 +213,11 @@ impl RealisticMessage {
             10
         };
 
-        !self.is_expired() && 
-        self.hop_count < max_hops && 
-        self.payload.len() <= 1024 * 1024 && // 1MB max
-        !self.id.is_empty() &&
-        !self.sender.is_empty()
+        !self.is_expired()
+            && self.hop_count < max_hops
+            && self.payload.len() <= 1024 * 1024 // 1MB max
+            && !self.id.is_empty()
+            && !self.sender.is_empty()
     }
 
     fn increment_hop(&mut self) -> Result<(), String> {
