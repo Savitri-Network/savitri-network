@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config clang cmake ninja-build \
+            libssl-dev zlib1g-dev liblz4-dev libzstd-dev protobuf-compiler
+      - name: cargo clippy
+        # Initially advisory: clippy is informative but not gating until the
+        # workspace is fully clean. Flip to `-D warnings` once the suggested
+        # lints have been addressed.
+        run: cargo clippy --workspace --all-targets -- -W clippy::all
+        continue-on-error: true
+
+  check:
+    name: cargo check (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - default
+          - all-features
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: check-${{ matrix.target }}
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config clang cmake ninja-build \
+            libssl-dev zlib1g-dev liblz4-dev libzstd-dev protobuf-compiler
+      - name: cargo check (default features)
+        if: matrix.target == 'default'
+        run: cargo check --workspace
+      - name: cargo check --all-features
+        if: matrix.target == 'all-features'
+        run: cargo check --workspace --all-features
+
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    needs: [fmt, check]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: test
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config clang cmake ninja-build \
+            libssl-dev zlib1g-dev liblz4-dev libzstd-dev protobuf-compiler
+      - name: cargo test --workspace --no-fail-fast
+        run: cargo test --workspace --no-fail-fast
+
+  doc:
+    name: cargo doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: doc
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config clang cmake ninja-build \
+            libssl-dev zlib1g-dev liblz4-dev libzstd-dev protobuf-compiler
+      - name: cargo doc (no-deps)
+        env:
+          RUSTDOCFLAGS: "-D rustdoc::broken-intra-doc-links"
+        run: cargo doc --workspace --no-deps
