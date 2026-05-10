@@ -1,0 +1,18 @@
+[package]
+name = "rpc-loadtest"
+version = "0.1.0"
+edition = "2021"
+description = "RPC load test tool for Savitri Network — simulates 1M wallet transactions"
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "=1.3.3"
+sha2 = "=0.10.8"
+hex = "0.4"
+ed25519-dalek = { version = "=2.1", features = ["rand_core"] }
+anyhow = "1.0"
+serde-big-array = "0.5"
+futures = "0.3"

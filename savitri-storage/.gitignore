@@ -1,0 +1,207 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+target/
+build/
+*.exe
+*.pdb
+# Database files (RocksDB, SQLite, etc.)
+/db/
+db/
+*.db/
+*.db
+*.sst
+*.log
+CURRENT
+IDENTITY
+LOCK
+LOG*
+MANIFEST-*
+OPTIONS-*
+
+# Private keys and sensitive files
+*.key
+identity.key
+masternode.key
+lightnode-tx.key
+lightnode-producer.key
+lightnode-network.key
+node_key.bin
+*.pem
+*.p12
+*.pfx
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE and Editor files
+## Visual Studio Code
+
+*.code-workspace
+.history/
+
+## Cursor
+.cursor/
+.cursorrules
+.cursorignore
+
+## IntelliJ IDEA / CLion / RustRover
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+## Vim
+*.swp
+*.swo
+*~
+.vim/
+
+## Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+## Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+## Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+## Linux
+*~
+.directory
+.Trash-*
+.nfs*
+
+# Build artifacts
+## CMake
+cmake-test/build/
+cmake-test/build*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+## C/C++ (if any)
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Test and benchmark outputs
+test_logs*.txt
+test_output*.txt
+test_results*/
+*.log
+*.test
+criterion/
+benches/target/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.swp
+*.swo
+*~
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+site/
+
+# Coverage reports
+coverage/
+*.gcov
+*.gcda
+*.gcno
+lcov.info
+tarpaulin-report.html
+
+# Profiling data
+*.profdata
+perf.data*
+flamegraph.svg
+
+# Package files
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Local configuration files (keep examples)
+masternode.toml
+lightnode.toml
+!masternode.example.toml
+!lightnode.example.toml
+*.toml.local
+
+# Node data directories
+/data/
+data/
+blocks/
+chainstate/
+peers.dat
+
+# VCPKG (external dependency, should not be tracked)
+/vcpkg/
+
+# Benchmark workspace
+benchmarks/workspace/target/
+benchmarks/workspace/Cargo.lock
+
+# Scripts output
+*.ps1.log
+*.sh.log
+
+# Generated files
+*.generated.*
+<<<<<<< HEAD
+generated/
+=======
+generated/
+>>>>>>> b2fb7482c9c5bfd923689a498366d49c381e99fc

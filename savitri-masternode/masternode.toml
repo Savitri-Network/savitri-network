@@ -1,0 +1,48 @@
+# Sample masternode configuration for development.
+# Copy this file to a writable location (e.g. <path>/configs/masternode.toml)
+# and customize the fields before launching the masternode binary.
+
+# Path to storage database
+storage_path = "storage"
+
+role = "Masternode"
+
+# Path to the libp2p network identity key (protobuf-encoded).
+network_key_path = "identity.key"
+
+# Path to the masternode signing key. Replace or remove if unused.
+masternode_key_path = "masternode.key"
+
+# TCP port the node listens on for libp2p gossip.
+p2p_port = 4022
+
+# Slot duration controls how often leadership rotates.
+# Accepts human-readable strings like "1s", "500ms", "2m".
+slot_duration = "1s"
+
+# Base timestamp for slot calculations (milliseconds since epoch).
+slot_base_ms = 0
+
+# Interval for creating new monoliths (seconds).
+monolith_interval_secs = 30
+
+# Maximum number of blocks to keep in a monolith.
+monolith_max_blocks = 10000
+
+# Interval for processing transactions (seconds). Set to 0 to disable.
+tx_interval_secs = 0
+
+# Interval for creating new blocks (seconds).
+block_interval_secs = 5
+
+# Maximum number of transactions per block.
+max_block_txs = 64
+
+# Validator stake requirement (minimum tokens to become a validator).
+validator_stake = 1000000
+
+# Bootstrap peers for initial network connection.
+bootstrap_peers = []
+
+# List of validator node identifiers.
+validators = ["mn-1"]

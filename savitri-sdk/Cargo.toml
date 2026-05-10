@@ -1,0 +1,63 @@
+[package]
+name = "savitri-sdk"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Savitri Network"]
+description = "SDK for Savitri Network - JSON-RPC 2.0 client, wallet, transaction building"
+homepage = "https://savitrinetwork.com"
+repository = "https://github.com/savitri-network/savitri-sdk"
+readme = "README.md"
+
+[dependencies]
+# HTTP client for JSON-RPC 2.0
+reqwest = { version = "0.12", features = ["json"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "=1.3.3"
+serde-big-array = "0.5"
+
+# Async runtime
+tokio = { version = "1.35.0", features = ["full"] }
+
+# Utilities
+anyhow = "1.0"
+thiserror = "1.0"
+hex = "0.4"
+log = "0.4"
+env_logger = "0.10"
+sha2 = "=0.10.8"
+
+# Cryptography
+ed25519-dalek = { version = "=2.1", features = ["rand_core"] }
+rand = { version = "=0.8.5", features = ["std", "std_rng"] }
+zeroize = { version = "1.6", features = ["zeroize_derive"] }
+
+[dev-dependencies]
+tempfile = "3.3"
+tokio-test = "0.4"
+
+[features]
+default = []
+
+[lib]
+name = "savitri_sdk"
+path = "src/lib.rs"
+
+[[bin]]
+name = "key_generator"
+path = "tools/key_generator.rs"
+
+[[bin]]
+name = "transaction_signer"
+path = "tools/transaction_signer.rs"
+
+[[bin]]
+name = "raw_tx_builder"
+path = "tools/raw_tx_builder.rs"
+
+[[bin]]
+name = "network_monitor"
+path = "tools/network_monitor.rs"

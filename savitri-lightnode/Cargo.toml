@@ -1,0 +1,121 @@
+[package]
+name = "savitri-lightnode"
+version = "0.1.0"
+default-run = "savitri-lightnode"
+
+edition = "2021"
+license = "MIT"
+authors = ["Savitri Network"]
+description = "Light node implementation for Savitri Network - optimized for mobile and desktop"
+homepage = "https://savitrinetwork.com"
+repository = "https://github.com/savitri-network/savitri-lightnode"
+keywords = ["blockchain", "node", "light", "mobile", "savitri"]
+categories = ["blockchain"]
+
+[dependencies]
+# Core dependencies - LOCAL PATH FOR TESTING
+savitri-core = { path = "../savitri-core", features = ["testnet"] }
+savitri-rpc = { path = "../savitri-rpc", optional = true }
+savitri-contracts = { path = "../Savitri-contracts", optional = true }
+savitri-zkp = { path = "../savitri-zkp", default-features = false, features = ["arkworks"] }
+savitri-p2p = { path = "../savitri-p2p", default-features = false, features = ["gossipsub", "kademlia"] }
+savitri-mempool = { path = "../savitri-mempool" }
+# Use default-features = false so we can toggle rocksdb via feature.
+# RocksDB requires MSVC (cl.exe) on Windows; use --no-default-features --features "desktop" to build without it.
+savitri-storage = { path = "../savitri-storage", default-features = false }
+savitri-consensus = { path = "../savitri-consensus", features = ["pou-based", "lightweight"] }
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+bincode = "=1.3.3"
+
+# Cryptography
+sha2 = "=0.10.8"
+sha3 = "0.10"
+hex = "0.4"
+ed25519-dalek = { version = "=2.1", features = ["batch", "rand_core"] }
+
+# Additional dependencies for P2P and performance
+ahash = "0.8"
+dashmap = "5.5"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# HTTP client for peer registry bootstrap fetch
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Metrics (optional, lightweight)
+metrics = { version = "0.24", optional = true }
+
+# System monitoring (mobile: optional, desktop: optional)
+sysinfo = { version = "0.30", optional = true }
+
+# P2P networking
+libp2p = { version = "0.55", features = [
+    "gossipsub",
+    "dns",
+    "tokio",
+    "tcp",
+    "yamux",
+    "noise",
+    "kad",
+    "identify",
+    "macros",
+    "request-response",
+    "relay",      # Relay client transport (NAT traversal)
+    "dcutr",      # Direct connection upgrade via hole-punching
+    "autonat",    # Automatic NAT detection
+    "quic",       # QUIC/UDP transport (NAT-friendly, built-in TLS 1.3)
+] }
+
+# Utilities
+once_cell = "1.19"
+rand = "=0.8.5"
+rand_core = { version = "0.6", features = ["std"] }
+num_cpus = "1.16"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Missing dependencies
+async-trait = "0.1"
+dotenvy = "0.15"
+serde-big-array = "0.5"
+zeroize = "1.7"
+metrics-exporter-prometheus = { version = "0.18", optional = true, default-features = false, features = ["http-listener"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp"] }
+
+[features]
+default = ["desktop", "rocksdb"]
+# RocksDB (persistent storage) - requires MSVC on Windows. Omit with --no-default-features.
+rocksdb = ["savitri-storage/rocksdb"]
+mobile = ["lightweight-p2p"]
+rpc = ["savitri-rpc"]
+desktop = ["full-p2p"]
+lightweight-p2p = []
+full-p2p = ["metrics", "sysinfo", "metrics-exporter-prometheus"]
+contracts = ["dep:savitri-contracts"]
+# Test-only: simulated latency for PoU verification when no real RTT (e.g. localhost). Excluded from release builds.
+test_simulated_latency = []
+
+[[bin]]
+name = "savitri-lightnode"
+path = "src/main.rs"
+
+[[bin]]
+name = "derive-pubkey"
+path = "src/bin/derive_pubkey.rs"

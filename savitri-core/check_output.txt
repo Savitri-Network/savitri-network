@@ -1,0 +1,841 @@
+warning: hard linking files in the incremental compilation cache failed. copying files instead. consider moving the cache directory to a file system which supports hard linking in session dir `\\?\F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\Savitri-core\target\debug\incremental\savitri_storage-2sbzqxon9pelg\s-hfc4bf578u-03z72qn-working`
+
+warning: unused import: `std::collections::HashMap`
+  --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\governance.rs:12:5
+   |
+12 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `std::collections::HashMap`
+  --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\oracle.rs:13:5
+   |
+13 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\fl.rs:13:5
+   |
+13 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `params`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\governance.rs:380:9
+    |
+380 |         params: &GovernanceParams,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_params`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `model_id`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\governance.rs:416:44
+    |
+416 |             ProposalAction::AbortFlRound { model_id, round_id } => {
+    |                                            ^^^^^^^^ help: try ignoring the field: `model_id: _`
+
+warning: unused variable: `contract`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\contracts.rs:292:31
+    |
+292 |     fn update_contract(&self, contract: &ContractInfo) -> Result<()> {
+    |                               ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_contract`
+
+warning: unused variable: `address`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\contracts.rs:301:31
+    |
+301 |     fn delete_contract(&self, address: &[u8]) -> Result<()> {
+    |                               ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_address`
+
+warning: unused variable: `address`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\contracts.rs:309:35
+    |
+309 |     fn store_contract_code(&self, address: &[u8], code: &[u8]) -> Result<()> {
+    |                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_address`
+
+warning: unused variable: `code`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\contracts.rs:309:51
+    |
+309 |     fn store_contract_code(&self, address: &[u8], code: &[u8]) -> Result<()> {
+    |                                                   ^^^^ help: if this is intentional, prefix it with an underscore: `_code`
+
+warning: unused variable: `address`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\contracts.rs:322:38
+    |
+322 |     fn store_contract_storage(&self, address: &[u8], key: &[u8], value: &[u8]) -> Result<()> {
+    |                                      ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_address`
+
+warning: unused variable: `key`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\contracts.rs:322:54
+    |
+322 |     fn store_contract_storage(&self, address: &[u8], key: &[u8], value: &[u8]) -> Result<()> {
+    |                                                      ^^^ help: if this is intentional, prefix it with an underscore: `_key`
+
+warning: unused variable: `value`
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\contracts.rs:322:66
+    |
+322 |     fn store_contract_storage(&self, address: &[u8], key: &[u8], value: &[u8]) -> Result<()> {
+    |                                                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_value`
+
+warning: `savitri-storage` (lib) generated 13 warnings (run `cargo fix --lib -p savitri-storage` to apply 12 suggestions)
+    Checking savitri-core v0.1.0 (F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-core)
+error[E0412]: cannot find type `Storage` in this scope
+  --> src\core\validate.rs:72:15
+   |
+72 |     storage: &Storage,
+   |               ^^^^^^^ not found in this scope
+   |
+help: consider importing this struct
+   |
+ 1 + use savitri_storage::Storage;
+   |
+
+error[E0412]: cannot find type `Storage` in this scope
+   --> src\core\validate.rs:130:20
+    |
+130 |         _storage: &Storage,
+    |                    ^^^^^^^ not found in this scope
+    |
+help: consider importing this struct
+    |
+  1 + use savitri_storage::Storage;
+    |
+
+error[E0412]: cannot find type `Storage` in this scope
+   --> src\core\validate.rs:145:15
+    |
+145 |     storage: &Storage,
+    |               ^^^^^^^ not found in this scope
+    |
+help: consider importing this struct
+    |
+  1 + use savitri_storage::Storage;
+    |
+
+warning: unused import: `anyhow::Result`
+ --> src\core\executor\cache.rs:7:5
+  |
+7 | use anyhow::Result;
+  |     ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `MutexGuard`
+ --> src\core\executor_dag_metrics.rs:6:29
+  |
+6 | use std::sync::{Arc, Mutex, MutexGuard};
+  |                             ^^^^^^^^^^
+
+warning: unused imports: `SigningKey` and `VerifyingKey`
+  --> src\core\identity.rs:11:21
+   |
+11 | use ed25519_dalek::{SigningKey, VerifyingKey, Signer, Verifier};
+   |                     ^^^^^^^^^^  ^^^^^^^^^^^^
+
+warning: unused import: `anyhow::Context`
+ --> src\core\tx.rs:1:5
+  |
+1 | use anyhow::Context;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `bincode`
+ --> src\core\tx.rs:2:5
+  |
+2 | use bincode;
+  |     ^^^^^^^
+
+warning: unused import: `VerifyingKey as PublicKey`
+ --> src\core\tx.rs:3:21
+  |
+3 | use ed25519_dalek::{VerifyingKey as PublicKey};
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Bytes`
+ --> src\core\tx.rs:6:28
+  |
+6 | use serde_bytes::{ByteBuf, Bytes};
+  |                            ^^^^^
+
+warning: unused import: `Sha256`
+ --> src\core\tx.rs:7:20
+  |
+7 | use sha2::{Digest, Sha256};
+  |                    ^^^^^^
+
+warning: unused import: `savitri_storage::Storage`
+ --> src\core\tx.rs:9:5
+  |
+9 | use savitri_storage::Storage;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Account`
+  --> src\core\tx.rs:10:20
+   |
+10 | use super::types::{Account, FeeLimits};
+   |                    ^^^^^^^
+
+warning: unused import: `Sha512`
+  --> src\core\tx.rs:12:12
+   |
+12 | use sha2::{Sha512};
+   |            ^^^^^^
+
+warning: unused import: `sha3::Keccak256`
+  --> src\core\tx.rs:13:5
+   |
+13 | use sha3::Keccak256;
+   |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::BTreeMap`
+  --> src\core\tx.rs:14:5
+   |
+14 | use std::collections::BTreeMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Signature`
+   --> src\core\tx.rs:117:25
+    |
+117 |     use ed25519_dalek::{Signature, Verifier};
+    |                         ^^^^^^^^^
+
+warning: unused import: `CryptoRng`
+ --> src\crypto\encryption.rs:8:21
+  |
+8 | use rand::{RngCore, CryptoRng};
+  |                     ^^^^^^^^^
+
+warning: unused import: `super::*`
+   --> src\utils\convert.rs:370:9
+    |
+370 |     use super::*;
+    |         ^^^^^^^^
+
+warning: unused import: `super::*`
+   --> src\utils\convert.rs:472:9
+    |
+472 |     use super::*;
+    |         ^^^^^^^^
+
+warning: unnecessary parentheses around function argument
+   --> src\utils\convert.rs:567:23
+    |
+567 |             return Ok((major1 as i32 - major2 as i32));
+    |                       ^                             ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+567 -             return Ok((major1 as i32 - major2 as i32));
+567 +             return Ok(major1 as i32 - major2 as i32);
+    |
+
+warning: unnecessary parentheses around function argument
+   --> src\utils\convert.rs:571:23
+    |
+571 |             return Ok((minor1 as i32 - minor2 as i32));
+    |                       ^                             ^
+    |
+help: remove these parentheses
+    |
+571 -             return Ok((minor1 as i32 - minor2 as i32));
+571 +             return Ok(minor1 as i32 - minor2 as i32);
+    |
+
+warning: unnecessary parentheses around function argument
+   --> src\utils\convert.rs:574:12
+    |
+574 |         Ok((patch1 as i32 - patch2 as i32))
+    |            ^                             ^
+    |
+help: remove these parentheses
+    |
+574 -         Ok((patch1 as i32 - patch2 as i32))
+574 +         Ok(patch1 as i32 - patch2 as i32)
+    |
+
+error[E0599]: no method named `set_consensus_last_slot` found for struct `std::sync::Arc<Storage>` in the current scope
+   --> src\core\slot_scheduler.rs:314:32
+    |
+314 |             self.inner.storage.set_consensus_last_slot(slot)?;
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^ method not found in `std::sync::Arc<Storage>`
+
+error[E0597]: `summary_metric` does not live long enough
+   --> src\metrics\provider.rs:340:25
+    |
+339 |         for summary_metric in summary_metrics {
+    |             -------------- binding `summary_metric` declared here
+340 |             gauges.push(&summary_metric);
+    |             ------      ^^^^^^^^^^^^^^^ borrowed value does not live long enough
+    |             |
+    |             borrow later used here
+341 |         }
+    |         - `summary_metric` dropped here while still borrowed
+
+error[E0599]: no method named `delete_cf` found for struct `std::sync::Arc<Storage>` in the current scope
+   --> src\core\executor_callbacks.rs:111:14
+    |
+110 | /         self.storage
+111 | |             .delete_cf(CF_CALLBACKS, key)
+    | |_____________-^^^^^^^^^
+    |
+help: there is a method `delete` with a similar name, but with different arguments
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\mod.rs:382:5
+    |
+382 |     pub fn delete(&self, key: &[u8]) -> Result<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `sign` found for struct `SigningKey` in the current scope
+  --> src\core\genesis.rs:34:17
+   |
+34 |     signing_key.sign(data).to_bytes().to_vec()
+   |                 ^^^^
+   |
+  ::: C:\Users\andre\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\signature-2.2.0\src\signer.rs:15:8
+   |
+15 |     fn sign(&self, msg: &[u8]) -> S {
+   |        ---- the method is available for `SigningKey` here
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: trait `Signer` which provides `sign` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use ed25519_dalek::Signer;
+   |
+help: there is a method `try_sign` with a similar name
+   |
+34 |     signing_key.try_sign(data).to_bytes().to_vec()
+   |                 ++++
+
+error[E0599]: no method named `verify` found for struct `VerifyingKey` in the current scope
+  --> src\core\genesis.rs:59:19
+   |
+59 |     verifying_key.verify(data, &sig).is_ok()
+   |                   ^^^^^^ method not found in `VerifyingKey`
+   |
+  ::: C:\Users\andre\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\signature-2.2.0\src\verifier.rs:14:8
+   |
+14 |     fn verify(&self, msg: &[u8], signature: &S) -> Result<(), Error>;
+   |        ------ the method is available for `VerifyingKey` here
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: trait `Verifier` which provides `verify` is implemented but not in scope; perhaps you want to import it
+   |
+ 1 + use ed25519_dalek::Verifier;
+   |
+
+error[E0599]: no method named `get_block_hash_by_height` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:185:16
+    |
+185 |     if storage.get_block_hash_by_height(0)?.is_some() {
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `&Storage`
+
+error[E0599]: no method named `put_block` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:193:13
+    |
+193 |     storage.put_block(&block)?;
+    |             ^^^^^^^^^
+    |
+help: there is a method `get_block` with a similar name
+    |
+193 -     storage.put_block(&block)?;
+193 +     storage.get_block(&block)?;
+    |
+
+error[E0599]: no method named `set_block_hash_for_height` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:194:13
+    |
+194 |     storage.set_block_hash_for_height(0, &block.hash)?;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `&Storage`
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src\core\genesis.rs:195:13
+    |
+195 |     storage.set_chain_head(0, &block.hash)?;
+    |             ^^^^^^^^^^^^^^ - unexpected argument #1 of type `{integer}`
+    |
+note: method defined here
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\mod.rs:983:12
+    |
+983 |     pub fn set_chain_head(&self, block_data: &[u8]) -> Result<()> {
+    |            ^^^^^^^^^^^^^^
+help: remove the extra argument
+    |
+195 -     storage.set_chain_head(0, &block.hash)?;
+195 +     storage.set_chain_head(&block.hash)?;
+    |
+
+error[E0599]: no method named `put_vesting_schedule` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:220:17
+    |
+220 |         storage.put_vesting_schedule(&schedule)?;
+    |                 ^^^^^^^^^^^^^^^^^^^^ method not found in `&Storage`
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:224:32
+    |
+224 |     storage.put_supply_manager(&supply_manager)?;
+    |             ------------------ ^^^^^^^^^^^^^^^ expected `&[u8]`, found `&SupplyManager`
+    |             |
+    |             arguments to this method are incorrect
+    |
+    = note: expected reference `&[u8]`
+               found reference `&SupplyManager`
+note: method defined here
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\mod.rs:998:12
+    |
+998 |     pub fn put_supply_manager(&self, supply_manager: &[u8]) -> Result<()> {
+    |            ^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:234:18
+    |
+234 |         address: decode_hex::<32>("0x0000000000000000000000000000000000000001").unwrap(),
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Vec<u8>`, found `[u8; 32]`
+    |
+    = note: expected struct `Vec<u8>`
+                found array `[u8; 32]`
+help: try using a conversion method
+    |
+234 |         address: decode_hex::<32>("0x0000000000000000000000000000000000000001").unwrap().to_vec(),
+    |                                                                                         +++++++++
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:247:18
+    |
+247 |         address: decode_hex::<32>("0x0000000000000000000000000000000000000002").unwrap(),
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Vec<u8>`, found `[u8; 32]`
+    |
+    = note: expected struct `Vec<u8>`
+                found array `[u8; 32]`
+help: try using a conversion method
+    |
+247 |         address: decode_hex::<32>("0x0000000000000000000000000000000000000002").unwrap().to_vec(),
+    |                                                                                         +++++++++
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:260:18
+    |
+260 |         address: decode_hex::<32>("0x0000000000000000000000000000000000000003").unwrap(),
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Vec<u8>`, found `[u8; 32]`
+    |
+    = note: expected struct `Vec<u8>`
+                found array `[u8; 32]`
+help: try using a conversion method
+    |
+260 |         address: decode_hex::<32>("0x0000000000000000000000000000000000000003").unwrap().to_vec(),
+    |                                                                                         +++++++++
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:273:18
+    |
+273 |         address: decode_hex::<32>("0x0000000000000000000000000000000000000004").unwrap(),
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Vec<u8>`, found `[u8; 32]`
+    |
+    = note: expected struct `Vec<u8>`
+                found array `[u8; 32]`
+help: try using a conversion method
+    |
+273 |         address: decode_hex::<32>("0x0000000000000000000000000000000000000004").unwrap().to_vec(),
+    |                                                                                         +++++++++
+
+error[E0609]: no field `nonce` on type `std::option::Option<Vec<u8>>`
+   --> src\core\genesis.rs:424:24
+    |
+424 |         sender_account.nonce = 0;
+    |                        ^^^^^ unknown field
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:425:50
+    |
+425 |         storage.put_account(&tx.from.as_bytes(), &sender_account)?;
+    |                 -----------                      ^^^^^^^^^^^^^^^ expected `&[u8]`, found `&Option<Vec<u8>>`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+    = note: expected reference `&[u8]`
+               found reference `&std::option::Option<Vec<u8>>`
+note: method defined here
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\mod.rs:823:12
+    |
+823 |     pub fn put_account(&self, address: &[u8], account_data: &[u8]) -> Result<()> {
+    |            ^^^^^^^^^^^
+
+error[E0609]: no field `balance` on type `std::option::Option<Vec<u8>>`
+   --> src\core\genesis.rs:429:27
+    |
+429 |         recipient_account.balance += tx.amount;
+    |                           ^^^^^^^ unknown field
+
+error[E0609]: no field `nonce` on type `std::option::Option<Vec<u8>>`
+   --> src\core\genesis.rs:430:27
+    |
+430 |         recipient_account.nonce = 0;
+    |                           ^^^^^ unknown field
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:431:48
+    |
+431 |         storage.put_account(&tx.to.as_bytes(), &recipient_account)?;
+    |                 -----------                    ^^^^^^^^^^^^^^^^^^ expected `&[u8]`, found `&Option<Vec<u8>>`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+    = note: expected reference `&[u8]`
+               found reference `&std::option::Option<Vec<u8>>`
+note: method defined here
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\mod.rs:823:12
+    |
+823 |     pub fn put_account(&self, address: &[u8], account_data: &[u8]) -> Result<()> {
+    |            ^^^^^^^^^^^
+
+error[E0599]: no method named `delete_block_hash_for_height` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:557:13
+    |
+557 |     storage.delete_block_hash_for_height(0)?;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `&Storage`
+
+error[E0599]: no method named `delete_block` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:558:13
+    |
+558 |     storage.delete_block(&load_genesis_block()?.hash)?;
+    |             ^^^^^^^^^^^^
+    |
+help: there is a method `delete` with a similar name
+    |
+558 -     storage.delete_block(&load_genesis_block()?.hash)?;
+558 +     storage.delete(&load_genesis_block()?.hash)?;
+    |
+
+error[E0599]: no method named `delete_chain_head` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:561:13
+    |
+561 |     storage.delete_chain_head()?;
+    |             ^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `get_chain_head` with a similar name
+    |
+561 -     storage.delete_chain_head()?;
+561 +     storage.get_chain_head()?;
+    |
+
+error[E0599]: no method named `get_block_hash_by_height` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:568:13
+    |
+568 |     storage.get_block_hash_by_height(0)?.is_some()
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `&Storage`
+
+error[E0599]: no method named `get_block_hash_by_height` found for reference `&Storage` in the current scope
+   --> src\core\genesis.rs:573:33
+    |
+573 |     if let Some(hash) = storage.get_block_hash_by_height(0)? {
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `&Storage`
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:574:27
+    |
+574 |         storage.get_block(&hash)
+    |                 --------- ^^^^^ expected `u64`, found `&_`
+    |                 |
+    |                 arguments to this method are incorrect
+    |
+    = note:   expected type `u64`
+            found reference `&_`
+note: method defined here
+   --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\mod.rs:966:12
+    |
+966 |     pub fn get_block(&self, height: u64) -> Result<Option<Vec<u8>>> {
+    |            ^^^^^^^^^
+help: consider removing the borrow
+    |
+574 -         storage.get_block(&hash)
+574 +         storage.get_block(hash)
+    |
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:574:9
+    |
+572 | pub fn get_genesis_block_from_storage(storage: &Storage) -> Result<Option<Block>> {
+    |                                                             --------------------- expected `std::result::Result<std::option::Option<Block>, anyhow::Error>` because of return type
+573 |     if let Some(hash) = storage.get_block_hash_by_height(0)? {
+574 |         storage.get_block(&hash)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Option<Block>, Error>`, found `Result<Option<Vec<u8>>, Error>`
+    |
+    = note: expected enum `std::result::Result<std::option::Option<Block>, _>`
+               found enum `std::result::Result<std::option::Option<Vec<u8>>, _>`
+
+error[E0308]: mismatched types
+    --> src\core\genesis.rs:600:34
+     |
+ 600 |       storage.put_genesis_metadata(&GenesisMetadata {
+     |  _____________--------------------_^
+     | |             |
+     | |             arguments to this method are incorrect
+ 601 | |         block_hash: block.hash.to_vec(),
+ 602 | |         timestamp: block.timestamp,
+ 603 | |         proposer: block.proposer,
+ 604 | |         total_supply: get_initial_supply()?,
+ 605 | |         transaction_count: block.transactions.len(),
+ 606 | |     })?;
+     | |_____^ expected `&[u8]`, found `&GenesisMetadata`
+     |
+     = note: expected reference `&[u8]`
+                found reference `&GenesisMetadata`
+note: method defined here
+    --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-storage\src\storage\mod.rs:1008:12
+     |
+1008 |     pub fn put_genesis_metadata(&self, metadata: &[u8]) -> Result<()> {
+     |            ^^^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> src\core\genesis.rs:624:5
+    |
+623 | pub fn get_genesis_metadata(storage: &Storage) -> Result<Option<GenesisMetadata>> {
+    |                                                   ------------------------------- expected `std::result::Result<std::option::Option<GenesisMetadata>, anyhow::Error>` because of return type
+624 |     storage.get_genesis_metadata()
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<Option<GenesisMetadata>, Error>`, found `Result<Option<Vec<u8>>, Error>`
+    |
+    = note: expected enum `std::result::Result<std::option::Option<GenesisMetadata>, _>`
+               found enum `std::result::Result<std::option::Option<Vec<u8>>, _>`
+
+error[E0369]: binary operation `==` cannot be applied to type `std::option::Option<ZkProof>`
+  --> src\core\monolith.rs:93:5
+   |
+53 | #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+   |                                                --------- in this derive macro expansion
+...
+93 |     pub zkp_proof: Option<ZkProof>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the foreign item type `ZkProof` doesn't implement `PartialEq`
+  --> F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\Savitri-ZKP\src\zkp.rs:7:1
+   |
+ 7 | pub struct ZkProof {
+   | ^^^^^^^^^^^^^^^^^^ not implement `PartialEq`
+
+error[E0277]: the trait bound `ZkProof: std::cmp::Eq` is not satisfied
+  --> src\core\monolith.rs:93:5
+   |
+53 | #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+   |                                                           -- in this derive macro expansion
+...
+93 |     pub zkp_proof: Option<ZkProof>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::cmp::Eq` is not implemented for `ZkProof`
+   |
+   = help: the trait `std::cmp::Eq` is implemented for `std::option::Option<T>`
+   = note: required for `std::option::Option<ZkProof>` to implement `std::cmp::Eq`
+note: required by a bound in `AssertParamIsEq`
+  --> /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234\library\core\src\cmp.rs:367:1
+
+error[E0599]: no method named `get_consensus_slot_base_ms` found for struct `std::sync::Arc<Storage>` in the current scope
+   --> src\core\slot_scheduler.rs:211:49
+    |
+211 |         let base_ms = if let Some(ms) = storage.get_consensus_slot_base_ms()? {
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `std::sync::Arc<Storage>`
+
+error[E0599]: no method named `set_consensus_slot_base_ms` found for struct `std::sync::Arc<Storage>` in the current scope
+   --> src\core\slot_scheduler.rs:217:21
+    |
+217 |             storage.set_consensus_slot_base_ms(cfg_base)?;
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `std::sync::Arc<Storage>`
+
+error[E0599]: no method named `get_consensus_last_slot` found for struct `std::sync::Arc<Storage>` in the current scope
+   --> src\core\slot_scheduler.rs:221:33
+    |
+221 |         let last_slot = storage.get_consensus_last_slot()?;
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^ method not found in `std::sync::Arc<Storage>`
+
+error[E0282]: type annotations needed
+   --> src\core\slot_scheduler.rs:224:29
+    |
+224 |             Some(stored) => stored.max(now_slot),
+    |                             ^^^^^^ cannot infer type
+
+error[E0599]: no method named `set_consensus_last_slot` found for struct `std::sync::Arc<Storage>` in the current scope
+   --> src\core\slot_scheduler.rs:254:18
+    |
+251 | /             scheduler
+252 | |                 .inner
+253 | |                 .storage
+254 | |                 .set_consensus_last_slot(initial_slot)?;
+    | |                 -^^^^^^^^^^^^^^^^^^^^^^^ method not found in `std::sync::Arc<Storage>`
+    | |_________________|
+    |
+
+error[E0284]: type annotations needed
+  --> src\crypto\encryption.rs:37:19
+   |
+37 |         let key = Key::from_slice(&key_bytes);
+   |                   ^^^ cannot infer type for type parameter `B` declared on the type alias `Key`
+   |
+   = note: cannot satisfy `<_ as KeySizeUser>::KeySize == _`
+
+error[E0283]: type annotations needed
+   --> src\crypto\encryption.rs:37:19
+    |
+ 37 |         let key = Key::from_slice(&key_bytes);
+    |                   ^^^ cannot infer type
+    |
+    = note: multiple `impl`s satisfying `_: ArrayLength<u8>` found in the `generic_array` crate:
+            - impl<T, N> ArrayLength<T> for UInt<N, B0>
+              where N: ArrayLength<T>;
+            - impl<T, N> ArrayLength<T> for UInt<N, B1>
+              where N: ArrayLength<T>;
+            - impl<T> ArrayLength<T> for UTerm;
+note: required by a bound in `GenericArray`
+   --> C:\Users\andre\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\generic-array-0.14.7\src\lib.rs:179:31
+    |
+179 | pub struct GenericArray<T, U: ArrayLength<T>> {
+    |                               ^^^^^^^^^^^^^^ required by this bound in `GenericArray`
+
+error[E0284]: type annotations needed
+  --> src\crypto\encryption.rs:45:19
+   |
+45 |         let key = Key::from_slice(key);
+   |                   ^^^ cannot infer type for type parameter `B` declared on the type alias `Key`
+   |
+   = note: cannot satisfy `<_ as KeySizeUser>::KeySize == _`
+
+error[E0283]: type annotations needed
+   --> src\crypto\encryption.rs:45:19
+    |
+ 45 |         let key = Key::from_slice(key);
+    |                   ^^^ cannot infer type
+    |
+    = note: multiple `impl`s satisfying `_: ArrayLength<u8>` found in the `generic_array` crate:
+            - impl<T, N> ArrayLength<T> for UInt<N, B0>
+              where N: ArrayLength<T>;
+            - impl<T, N> ArrayLength<T> for UInt<N, B1>
+              where N: ArrayLength<T>;
+            - impl<T> ArrayLength<T> for UTerm;
+note: required by a bound in `GenericArray`
+   --> C:\Users\andre\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\generic-array-0.14.7\src\lib.rs:179:31
+    |
+179 | pub struct GenericArray<T, U: ArrayLength<T>> {
+    |                               ^^^^^^^^^^^^^^ required by this bound in `GenericArray`
+
+error[E0599]: no method named `key` found for struct `AesGcm<Aes, NonceSize, TagSize>` in the current scope
+  --> src\crypto\encryption.rs:88:21
+   |
+88 |         self.cipher.key().into()
+   |                     ^^^ method not found in `AesGcm<Aes256, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>>`
+
+error[E0277]: the trait bound `HmacCore<CoreWrapper<...>>: HashMarker` is not satisfied
+   --> src\crypto\encryption.rs:258:23
+    |
+258 |         pbkdf2_hmac::<Hmac<Sha256>>(
+    |                       ^^^^^^^^^^^^ the trait `HashMarker` is not implemented for `HmacCore<CoreWrapper<CtVariableCoreWrapper<Sha256VarCore, ..., ...>>>`
+    |
+    = help: the following other types implement trait `HashMarker`:
+              CShake128Core
+              CShake256Core
+              CoreWrapper<T>
+              CtVariableCoreWrapper<T, OutSize, O>
+              Keccak224Core
+              Keccak256Core
+              Keccak256FullCore
+              Keccak384Core
+            and 12 others
+note: required by a bound in `pbkdf2_hmac`
+   --> C:\Users\andre\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\pbkdf2-0.12.2\src\lib.rs:238:11
+    |
+234 | pub fn pbkdf2_hmac<D>(password: &[u8], salt: &[u8], rounds: u32, res: &mut [u8])
+    |        ----------- required by a bound in this function
+...
+238 |         + HashMarker
+    |           ^^^^^^^^^^ required by this bound in `pbkdf2_hmac`
+    = note: the full name for the type has been written to 'F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-core\target\debug\deps\savitri_core-e438a673ed61edc2.long-type-14553363556483856501.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `HmacCore<CoreWrapper<CtVariableCoreWrapper<..., ..., ...>>>: Default` is not satisfied
+   --> src\crypto\encryption.rs:258:23
+    |
+258 |         pbkdf2_hmac::<Hmac<Sha256>>(
+    |                       ^^^^^^^^^^^^ the trait `Default` is not implemented for `HmacCore<CoreWrapper<CtVariableCoreWrapper<Sha256VarCore, ..., ...>>>`
+    |
+note: required by a bound in `pbkdf2_hmac`
+   --> C:\Users\andre\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\pbkdf2-0.12.2\src\lib.rs:242:11
+    |
+234 | pub fn pbkdf2_hmac<D>(password: &[u8], salt: &[u8], rounds: u32, res: &mut [u8])
+    |        ----------- required by a bound in this function
+...
+242 |         + Default
+    |           ^^^^^^^ required by this bound in `pbkdf2_hmac`
+    = note: the full name for the type has been written to 'F:\Github Savitri Repository Standalone\Networkk Test\Network-Test-24-01-2026\savitri-core\target\debug\deps\savitri_core-e438a673ed61edc2.long-type-14553363556483856501.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+warning: unused import: `Digest`
+ --> src\core\tx.rs:7:12
+  |
+7 | use sha2::{Digest, Sha256};
+  |            ^^^^^^
+
+warning: unused variable: `signature`
+   --> src\core\identity.rs:407:9
+    |
+407 |         signature: &[u8],
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_signature`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `timestamp`
+   --> src\core\identity.rs:408:9
+    |
+408 |         timestamp: u64,
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_timestamp`
+
+warning: unused variable: `peer_id_hash`
+   --> src\core\identity.rs:409:9
+    |
+409 |         peer_id_hash: &[u8],
+    |         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_peer_id_hash`
+
+warning: unused variable: `monolith_id`
+   --> src\core\monolith.rs:372:9
+    |
+372 |     let monolith_id = compute_monolith_id(&headers_commit, &state_commit, &proof_commit);
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_monolith_id`
+
+warning: unused variable: `block_count`
+   --> src\core\monolith.rs:376:9
+    |
+376 |     let block_count = blocks.len() as u64;
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_block_count`
+
+warning: unused variable: `size_bytes`
+   --> src\core\monolith.rs:380:9
+    |
+380 |     let size_bytes = blocks.iter().map(|b| b.size()).sum::<usize>() as u64;
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_size_bytes`
+
+warning: unused variable: `computed_proof`
+   --> src\core\monolith.rs:474:13
+    |
+474 |         let computed_proof = hasher.finalize();
+    |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_computed_proof`
+
+warning: unused variable: `tx`
+  --> src\core\receipt.rs:58:16
+   |
+58 |     pub fn new(tx: &SignedTx, tx_hash: [u8; 32]) -> Self {
+   |                ^^ help: if this is intentional, prefix it with an underscore: `_tx`
+
+warning: unused variable: `tx_bytes`
+  --> src\core\validate.rs:91:30
+   |
+91 | pub fn is_oracle_transaction(tx_bytes: &[u8]) -> bool {
+   |                              ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_tx_bytes`
+
+warning: unused variable: `provider`
+   --> src\metrics\mod.rs:180:30
+    |
+180 |     pub fn generate_manifest(provider: &MetricsProvider) -> MetricsManifest {
+    |                              ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_provider`
+
+warning: unused variable: `j`
+   --> src\compression.rs:138:17
+    |
+138 |             for j in 0..count {
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_j`
+
+Some errors have detailed explanations: E0061, E0277, E0282, E0283, E0284, E0308, E0369, E0412, E0597...
+For more information about an error, try `rustc --explain E0061`.
+warning: `savitri-core` (lib) generated 32 warnings
+error: could not compile `savitri-core` (lib) due to 46 previous errors; 32 warnings emitted

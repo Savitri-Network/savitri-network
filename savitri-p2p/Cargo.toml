@@ -1,0 +1,90 @@
+[package]
+name = "savitri-p2p"
+version = "0.1.0"
+edition = "2021"
+authors = ["Savitri Network Team"]
+license = "MIT"
+description = "Peer-to-peer networking layer for Savitri Network"
+repository = "https://github.com/savitri-network/savitri-p2p"
+keywords = ["p2p", "networking", "blockchain", "libp2p", "gossip"]
+categories = ["network-programming", "cryptography"]
+
+[features]
+default = ["gossipsub", "compression", "kademlia"]
+gossipsub = []
+compression = ["snap", "lz4"]  # zstd temporarily disabled due to MSVC issues
+kademlia = []  # Kademlia DHT support
+minimal = []
+
+[dependencies]
+# Core dependencies - LOCAL PATH FOR TESTING
+savitri-core = { path = "../savitri-core", features = ["shared-types"] }
+
+# ⭐ INDEPENDENT REPOSITORY - LOCAL TESTING
+# Using local path for now, will change to "0.1.0" after publication
+
+# libp2p ecosystem — MED-07: version range locked to 0.55.x to prevent silent
+# upgrade to 0.56 (breaking changes). Commit Cargo.lock to pin the exact patch.
+libp2p = { version = ">=0.55, <0.56", features = [
+    "gossipsub",
+    "mdns",
+    "dns",
+    "tokio",
+    "tcp",
+    "yamux",
+    "noise",
+    "identify",
+    "ping",
+    "autonat",
+    "relay",
+    "dcutr",
+    "upnp",
+    "quic",           # QUIC/UDP transport (NAT-friendly, built-in TLS 1.3)
+    "request-response",
+    "serde",
+    "kad",  # Kademlia DHT support
+] }
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3"
+futures-util = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "=1.3.3"
+
+# Async traits
+async-trait = "0.1"
+
+# Compression algorithms (optional)
+snap = { version = "1.1", optional = true }
+# zstd = { version = "0.13", optional = true }  # Temporarily disabled due to MSVC compilation issues
+lz4 = { version = "1.24", optional = true }
+
+# Cryptography
+sha2 = "=0.10.8"
+ed25519-dalek = { version = "=2.1", features = ["rand_core"] }
+rand = "=0.8.5"
+
+# Utilities
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+thiserror = "1.0"
+once_cell = "1.19"
+parking_lot = "0.12"
+hex = "0.4"
+
+# Metrics and monitoring
+prometheus = { version = "0.14", optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

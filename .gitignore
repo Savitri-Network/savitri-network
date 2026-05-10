@@ -1,0 +1,35 @@
+# Cargo build artefacts
+/target
+/target-*
+**/*.rs.bk
+
+# IDE / editor
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env / secrets
+.env
+.env.local
+*.pem
+*.key
+!**/keys/README*
+
+# Genesis generator output (contains private keys — never commit)
+genesis_testnet.json
+private_keys_testnet.md
+faucet_keys_testnet.json
+
+# Logs
+*.log
+logs/
+
+# Local testnet state
+/runtime_reports
+/local_test

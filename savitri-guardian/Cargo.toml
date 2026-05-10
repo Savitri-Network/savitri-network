@@ -1,0 +1,74 @@
+[package]
+name = "savitri-guardian"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Savitri Network"]
+description = "Guardian node for Savitri Network - full archive and backup system"
+homepage = "https://savitrinetwork.com"
+repository = "https://github.com/savitri-network/savitri-guardian"
+keywords = ["blockchain", "archive", "backup", "guardian", "savitri"]
+categories = ["blockchain"]
+
+[dependencies]
+# Core dependencies - PUBLISHED VERSIONS
+savitri-core = { path = "../savitri-core" }
+savitri-p2p = { path = "../savitri-p2p" }
+savitri-storage = { path = "../savitri-storage" }
+
+# ⭐ INDEPENDENT REPOSITORY - LOCAL TESTING
+# Using local paths for now, will change to "0.1.0" after publication
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-big-array = "0.5"
+toml = "0.8"
+bincode = "=1.3.3"
+hex = "0.4"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Metrics (optional)
+metrics = { version = "0.24", optional = true }
+metrics-exporter-prometheus = { version = "0.18", optional = true }
+
+# System monitoring (optional)
+sysinfo = { version = "0.30", optional = true }
+
+# P2P networking
+libp2p = { version = "0.55", features = [
+    "gossipsub",
+    "dns",
+    "tokio",
+    "tcp",
+    "yamux",
+    "noise",
+] }
+
+# Storage
+rocksdb = { version = "0.22", default-features = false, features = ["snappy", "lz4", "zlib"], optional = true }
+
+# Utilities
+anyhow = "1.0"
+thiserror = "1.0"
+once_cell = "1.19"
+num_cpus = "1.0"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+[features]
+default = ["archive", "monitoring"]
+archive = ["rocksdb"]
+monitoring = ["metrics", "metrics-exporter-prometheus", "sysinfo"]
+
+[[bin]]
+name = "savitri-guardian"
+path = "src/main.rs"

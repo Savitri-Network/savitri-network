@@ -1,0 +1,829 @@
+# Public API surface snapshot — pre-refactor
+# Generated: 2026-04-27T20:43:29Z
+# Tag: pre-refactor-foundations
+# Branch: refactor/foundations-baseline
+
+## savitri-consensus
+  savitri-consensus/src/crypto/hashes.rs:11:pub enum HashError {
+  savitri-consensus/src/crypto/hashes.rs:19:pub type HashResult<T> = std::result::Result<T, HashError>;
+  savitri-consensus/src/crypto/hashes.rs:22:pub fn sha256(data: &[u8]) -> [u8; 32] {
+  savitri-consensus/src/crypto/hashes.rs:32:pub fn sha512(data: &[u8]) -> [u8; 64] {
+  savitri-consensus/src/crypto/hashes.rs:42:pub fn blake2b512(data: &[u8]) -> [u8; 64] {
+  savitri-consensus/src/crypto/hashes.rs:52:pub fn blake2s256(data: &[u8]) -> [u8; 32] {
+  savitri-consensus/src/crypto/hashes.rs:62:pub fn double_sha256(data: &[u8]) -> [u8; 32] {
+  savitri-consensus/src/crypto/hashes.rs:67:pub fn compute_block_hash(
+  savitri-consensus/src/crypto/hashes.rs:84:pub fn compute_tx_hash(
+  savitri-consensus/src/crypto/hashes.rs:101:pub fn hash_nodes(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+  savitri-consensus/src/crypto/hashes.rs:109:pub fn hash_leaf(data: &[u8]) -> [u8; 32] {
+  savitri-consensus/src/crypto/hashes.rs:117:pub fn hash_internal(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+  savitri-consensus/src/crypto/hashes.rs:126:pub fn compute_state_root(state_entries: &[(&[u8], &[u8])]) -> [u8; 32] {
+  savitri-consensus/src/crypto/hashes.rs:143:pub fn hash_concat(parts: &[&[u8]]) -> [u8; 32] {
+  savitri-consensus/src/crypto/hashes.rs:155:pub fn hash_to_hex(hash: &[u8]) -> String {
+  savitri-consensus/src/crypto/hashes.rs:160:pub fn hex_to_hash_32(hex_str: &str) -> HashResult<[u8; 32]> {
+  savitri-consensus/src/crypto/hashes.rs:175:pub fn hex_to_hash_64(hex_str: &str) -> HashResult<[u8; 64]> {
+  savitri-consensus/src/crypto/merkle.rs:10:pub enum MerkleError {
+  savitri-consensus/src/crypto/merkle.rs:20:pub type MerkleResult<T> = std::result::Result<T, MerkleError>;
+  savitri-consensus/src/crypto/merkle.rs:24:pub enum ProofDirection {
+  savitri-consensus/src/crypto/merkle.rs:31:pub struct ProofStep {
+  savitri-consensus/src/crypto/merkle.rs:38:pub struct MerkleProof {
+  savitri-consensus/src/crypto/merkle.rs:62:pub struct MerkleTree {
+  savitri-consensus/src/crypto/merkle.rs:192:pub fn compute_tx_root(tx_hashes: &[[u8; 32]]) -> [u8; 32] {
+  savitri-consensus/src/crypto/merkle.rs:208:pub fn verify_tx_inclusion(
+  savitri-consensus/src/crypto/merkle.rs:217:pub fn compute_merkle_root(data: &[&[u8]]) -> MerkleResult<[u8; 32]> {
+  savitri-consensus/src/crypto/merkle.rs:224:pub struct MultiProof {
+  savitri-consensus/src/crypto/signatures.rs:14:pub enum SignatureError {
+  savitri-consensus/src/crypto/signatures.rs:30:pub type SignatureResult<T> = std::result::Result<T, SignatureError>;
+  savitri-consensus/src/crypto/signatures.rs:34:pub struct KeyPair {
+  savitri-consensus/src/crypto/signatures.rs:102:pub fn sign_message(message: &[u8], private_key: &[u8]) -> SignatureResult<[u8; 64]> {
+  savitri-consensus/src/crypto/signatures.rs:108:pub fn verify_signature(message: &[u8], signature: &[u8], public_key: &[u8]) -> SignatureResult<bool> {
+  savitri-consensus/src/crypto/signatures.rs:129:pub fn sign_block_hash(block_hash: &[u8; 64], private_key: &[u8]) -> SignatureResult<[u8; 64]> {
+  savitri-consensus/src/crypto/signatures.rs:134:pub fn verify_block_signature(
+  savitri-consensus/src/crypto/signatures.rs:143:pub fn sign_transaction(tx_hash: &[u8; 32], private_key: &[u8]) -> SignatureResult<[u8; 64]> {
+  savitri-consensus/src/crypto/signatures.rs:148:pub fn verify_transaction_signature(
+  savitri-consensus/src/crypto/signatures.rs:157:pub struct AggregateSignature {
+  savitri-consensus/src/dag/conflict_detector.rs:13:pub struct ConflictDetector {
+  savitri-consensus/src/dag/conflict_detector.rs:19:pub struct ConflictDetectionConfig {
+  savitri-consensus/src/dag/conflict_detector.rs:27:pub struct Conflict {
+  savitri-consensus/src/dag/conflict_detector.rs:37:pub enum ConflictType {
+  savitri-consensus/src/dag/conflict_detector.rs:45:pub enum ConflictSeverity {
+  savitri-consensus/src/dag/conflict_detector.rs:357:pub struct ConflictStats {
+  savitri-consensus/src/dag/manager.rs:14:pub struct DAGManager {
+  savitri-consensus/src/dag/types.rs:11:pub struct DAGConfig {
+  savitri-consensus/src/dag/types.rs:35:pub struct ConflictConfig {
+  savitri-consensus/src/dag/types.rs:59:pub struct BranchInfo {
+  savitri-consensus/src/dag/types.rs:78:pub enum BranchStatus {
+  savitri-consensus/src/dag/types.rs:99:pub struct Conflict {
+  savitri-consensus/src/dag/types.rs:118:pub enum ConflictType {
+  savitri-consensus/src/dag/types.rs:133:pub enum ConflictSeverity {
+  savitri-consensus/src/dag/types.rs:146:pub struct ConflictResolution {
+  savitri-consensus/src/dag/types.rs:159:pub enum ResolutionStrategy {
+  savitri-consensus/src/dag/types.rs:174:pub struct DAGStats {
+  savitri-consensus/src/dag/types.rs:212:pub type DAGResult<T> = Result<T, DAGError>;
+  savitri-consensus/src/dag/types.rs:216:pub enum DAGError {
+  savitri-consensus/src/error.rs:8:pub enum ConsensusError {
+  savitri-consensus/src/error.rs:107:pub type Result<T> = std::result::Result<T, ConsensusError>;
+  savitri-consensus/src/error.rs:110:pub type ValidationResult<T> = std::result::Result<T, ValidationError>;
+  savitri-consensus/src/error.rs:113:pub type ValidationErrorResult = std::result::Result<(), ValidationError>;
+  savitri-consensus/src/lib.rs:48:pub type PouScore = u16;
+  savitri-consensus/src/lib.rs:51:pub const POU_SCORE_MAX: PouScore = 1000;
+  savitri-consensus/src/lib.rs:55:pub enum ValidationResult {
+  savitri-consensus/src/lib.rs:73:pub struct BlockHeader {
+  savitri-consensus/src/lib.rs:299:pub struct Transaction {
+  savitri-consensus/src/lib.rs:338:pub struct Block {
+  savitri-consensus/src/lib.rs:398:pub struct ProposerInfo {
+  savitri-consensus/src/lib.rs:434:pub struct ConsensusState {
+  savitri-consensus/src/lib.rs:461:pub struct ConsensusStats {
+  savitri-consensus/src/lib.rs:484:pub struct BlockProposal {
+  savitri-consensus/src/lib.rs:538:pub struct PouScoreResult {
+  savitri-consensus/src/lib.rs:557:pub struct GroupAwareConfig {
+  savitri-consensus/src/lib.rs:744:pub struct PouConfig {
+  savitri-consensus/src/lib.rs:796:pub struct StorageConfig {
+  savitri-consensus/src/lib.rs:806:pub struct MemoryStorage {
+  savitri-consensus/src/lib.rs:862:pub struct GroupAwareConsensus {
+  savitri-consensus/src/lib.rs:1076:pub struct PouBasedConsensus {
+  savitri-consensus/src/lib.rs:1201:pub struct ConsensusVersion {
+  savitri-consensus/src/lib.rs:1225:pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+  savitri-consensus/src/protocols/bft.rs:21:pub struct BftConsensus {
+  savitri-consensus/src/protocols/bft.rs:40:pub struct BftConfig {
+  savitri-consensus/src/protocols/bft.rs:79:pub enum BftState {
+  savitri-consensus/src/protocols/bft.rs:100:pub struct BftProposal {
+  savitri-consensus/src/protocols/bft.rs:117:pub struct BftVote {
+  savitri-consensus/src/protocols/bft.rs:136:pub struct BftStats {
+  savitri-consensus/src/protocols/bft.rs:579:pub trait BftEngine: Send + Sync {
+  savitri-consensus/src/protocols/bft.rs:595:pub enum BftMessage {
+  savitri-consensus/src/protocols/bft.rs:612:pub struct BftCommit {
+  savitri-consensus/src/protocols/bft.rs:625:pub enum BftResponse {
+  savitri-consensus/src/protocols/bft.rs:637:pub struct DefaultBftEngine {
+  savitri-consensus/src/protocols/bft.rs:787:pub struct BftUtils;
+  savitri-consensus/src/protocols/group_aware.rs:18:pub type Result<T> = std::result::Result<T, ConsensusError>;
+  savitri-consensus/src/protocols/group_aware.rs:25:pub struct GroupAwareConsensus {
+  savitri-consensus/src/protocols/group_aware.rs:38:pub struct GroupAwareConfig {
+  savitri-consensus/src/protocols/group_aware.rs:501:pub struct GroupManager {
+  savitri-consensus/src/protocols/group_aware.rs:567:pub struct GroupProposerSelector {
+  savitri-consensus/src/protocols/group_aware.rs:726:pub struct GroupValidator {
+  savitri-consensus/src/protocols/group_aware.rs:878:pub struct ConsensusHealthChecker {
+  savitri-consensus/src/protocols/hybrid.rs:18:pub struct HybridConsensus {
+  savitri-consensus/src/protocols/hybrid.rs:31:pub struct HybridConfig {
+  savitri-consensus/src/protocols/hybrid.rs:73:pub enum HybridState {
+  savitri-consensus/src/protocols/hybrid.rs:88:pub struct HybridStats {
+  savitri-consensus/src/protocols/hybrid.rs:110:pub struct FallbackStrategy {
+  savitri-consensus/src/protocols/hybrid.rs:118:pub struct ConsensusFailure {
+  savitri-consensus/src/protocols/hybrid.rs:131:pub enum FailureSeverity {
+  savitri-consensus/src/protocols/hybrid.rs:139:pub struct HybridHealthChecker {
+  savitri-consensus/src/protocols/partition.rs:21:pub enum PartitionStatus {
+  savitri-consensus/src/protocols/partition.rs:40:pub struct PartitionEvent {
+  savitri-consensus/src/protocols/partition.rs:57:pub struct PartitionDetector {
+  savitri-consensus/src/protocols/pou_based.rs:109:pub struct PouBasedConsensus {
+  savitri-consensus/src/protocols/pou_based.rs:124:pub struct PouConfig {
+  savitri-consensus/src/protocols/pou_based.rs:565:pub struct PouCalculator {
+  savitri-consensus/src/protocols/pou_based.rs:703:pub struct ScoreManager {
+  savitri-consensus/src/protocols/pou_based.rs:769:pub struct PouProposer {
+  savitri-consensus/src/protocols/pou_based.rs:874:pub struct PouValidator {
+  savitri-consensus/src/scoring/observations.rs:32:pub const DEFAULT_WINDOW_SECS: u64 = 3600;
+  savitri-consensus/src/scoring/observations.rs:36:pub const MAX_SAMPLES_PER_METRIC: usize = 1024;
+  savitri-consensus/src/scoring/observations.rs:40:pub struct LatencySample {
+  savitri-consensus/src/scoring/observations.rs:51:pub struct ValidationSample {
+  savitri-consensus/src/scoring/observations.rs:60:pub enum SlashReason {
+  savitri-consensus/src/scoring/observations.rs:73:pub struct SlashEvent {
+  savitri-consensus/src/scoring/observations.rs:82:pub struct FlContributionSample {
+  savitri-consensus/src/scoring/observations.rs:93:pub struct PeerObservations {
+  savitri-consensus/src/scoring/observations.rs:152:pub struct ObservationStore {
+  savitri-consensus/src/scoring/streak_daemon.rs:33:pub const DEFAULT_STREAK_POLL_SECS: u64 = 60;
+  savitri-consensus/src/scoring/streak_daemon.rs:41:pub fn spawn_fl_streak_daemon(
+  savitri-consensus/src/scoring/streak_daemon.rs:58:pub fn spawn_fl_streak_daemon_with_thresholds(
+  savitri-consensus/src/scoring/streak_daemon.rs:158:pub fn default_epoch_provider() -> Arc<dyn Fn() -> u64 + Send + Sync> {
+  savitri-consensus/src/slashing.rs:32:pub struct SlashingManager {
+  savitri-consensus/src/traits/consensus.rs:37:pub trait ConsensusEngine: Send + Sync {
+  savitri-consensus/src/traits/proposer.rs:16:pub trait ProposerContext: Send + Sync {
+  savitri-consensus/src/traits/proposer.rs:61:pub trait Proposer: Send + Sync {
+  savitri-consensus/src/traits/proposer.rs:94:pub struct ProposerScore {
+  savitri-consensus/src/traits/proposer.rs:115:pub struct ProposalStats {
+  savitri-consensus/src/traits/proposer.rs:134:pub struct DefaultProposerContext {
+  savitri-consensus/src/traits/proposer.rs:285:pub struct DefaultProposer {
+  savitri-consensus/src/traits/proposer.rs:559:pub trait ProposalSigner: Send + Sync {
+  savitri-consensus/src/traits/proposer.rs:565:pub trait ProposerHealthChecker: Send + Sync {
+  savitri-consensus/src/traits/proposer.rs:576:pub struct HealthMetrics {
+  savitri-consensus/src/traits/proposer.rs:585:pub struct MockProposalSigner;
+  savitri-consensus/src/traits/proposer.rs:603:pub struct MockHealthChecker {
+  savitri-consensus/src/traits/storage.rs:13:pub trait Storage: Send + Sync {
+  savitri-consensus/src/traits/storage.rs:101:pub struct StorageStats {
+  savitri-consensus/src/traits/storage.rs:126:pub struct StorageConfig {
+  savitri-consensus/src/traits/storage.rs:170:pub struct MemoryStorage {
+  savitri-consensus/src/traits/validator.rs:17:pub trait ValidationContext: Send + Sync {
+  savitri-consensus/src/traits/validator.rs:70:pub trait Validator: Send + Sync {
+  savitri-consensus/src/traits/validator.rs:106:pub struct ValidationStats {
+  savitri-consensus/src/traits/validator.rs:116:pub struct DefaultValidationContext {
+  savitri-consensus/src/traits/validator.rs:244:pub struct DefaultValidator {
+  savitri-consensus/src/traits/validator.rs:458:pub trait SignatureValidator: Send + Sync {
+  savitri-consensus/src/traits/validator.rs:465:pub trait StateValidator: Send + Sync {
+  savitri-consensus/src/traits/validator.rs:472:pub struct MockSignatureValidator;
+  savitri-consensus/src/traits/validator.rs:489:pub struct MockStateValidator;
+  savitri-consensus/src/traits/validator.rs:506:pub struct MockValidationContext;
+  savitri-consensus/src/types/block.rs:14:pub struct Hash64(pub [u8; 64]);
+  savitri-consensus/src/types/block.rs:100:pub struct Hash32(pub [u8; 32]);
+  savitri-consensus/src/types/block.rs:170:pub struct Block {
+  savitri-consensus/src/types/block.rs:183:pub struct BlockHeader {
+  savitri-consensus/src/types/block.rs:214:pub struct Transaction {
+  savitri-consensus/src/types/block.rs:237:pub struct ConsensusData {
+  savitri-consensus/src/types/block.rs:251:pub struct ValidationProof {
+  savitri-consensus/src/types/block.rs:280:pub enum ValidationProofType {
+  savitri-consensus/src/types/block.rs:298:pub struct RoundInfo {
+  savitri-consensus/src/types/block.rs:339:pub struct Signature {
+  savitri-consensus/src/types/consensus.rs:11:pub struct ConsensusState {
+  savitri-consensus/src/types/consensus.rs:34:pub struct ConsensusConfig {
+  savitri-consensus/src/types/consensus.rs:73:pub enum ConsensusType {
+  savitri-consensus/src/types/consensus.rs:87:pub enum ProposerSelection {
+  savitri-consensus/src/types/consensus.rs:103:pub struct ValidationRequirements {
+  savitri-consensus/src/types/consensus.rs:170:pub struct ValidatorInfo {
+  savitri-consensus/src/types/consensus.rs:189:pub enum ValidatorStatus {
+  savitri-consensus/src/types/consensus.rs:205:pub struct ValidatorMetadata {
+  savitri-consensus/src/types/consensus.rs:220:pub enum NodeType {
+  savitri-consensus/src/types/consensus.rs:234:pub struct ConsensusMetrics {
+  savitri-consensus/src/types/consensus.rs:479:pub enum ConsensusMessage {
+  savitri-consensus/src/types/consensus.rs:504:pub struct ProposalMessage {
+  savitri-consensus/src/types/consensus.rs:523:pub struct VoteMessage {
+  savitri-consensus/src/types/consensus.rs:544:pub enum VoteType {
+  savitri-consensus/src/types/consensus.rs:555:pub struct CommitMessage {
+  savitri-consensus/src/types/consensus.rs:570:pub struct PrevoteMessage {
+  savitri-consensus/src/types/consensus.rs:587:pub struct PrecommitMessage {
+  savitri-consensus/src/types/consensus.rs:604:pub struct HeartbeatMessage {
+  savitri-consensus/src/types/consensus.rs:621:pub struct SyncMessage {
+  savitri-consensus/src/types/consensus.rs:632:pub enum SyncType {
+  savitri-consensus/src/types/consensus.rs:649:pub struct SyncRequestMessage {
+  savitri-consensus/src/types/consensus.rs:664:pub enum SyncRequestType {
+  savitri-consensus/src/types/consensus.rs:677:pub struct SyncResponseMessage {
+  savitri-consensus/src/types/consensus.rs:692:pub enum SyncResponseType {
+  savitri-consensus/src/types/consensus.rs:707:pub struct CustomMessage {
+  savitri-consensus/src/types/consensus.rs:722:pub enum ConsensusResponse {
+  savitri-consensus/src/types/consensus.rs:735:pub struct SuccessResponse {
+  savitri-consensus/src/types/consensus.rs:746:pub struct ErrorResponse {
+  savitri-consensus/src/types/consensus.rs:759:pub struct PendingResponse {
+  savitri-consensus/src/types/consensus.rs:770:pub struct CustomResponse {
+  savitri-consensus/src/types/consensus.rs:781:pub struct ConsensusStats {
+  savitri-consensus/src/types/consensus.rs:816:pub struct ConsensusHealthMetrics {
+  savitri-consensus/src/types/consensus.rs:837:pub struct ConsensusVersion {
+  savitri-consensus/src/types/proposal.rs:14:pub struct BlockProposal {
+  savitri-consensus/src/types/proposal.rs:47:pub struct ProposalTransaction {
+  savitri-consensus/src/types/proposal.rs:70:pub struct LatencyProofData {
+  savitri-consensus/src/types/proposal.rs:89:pub struct RttMeasurement {
+  savitri-consensus/src/types/proposal.rs:102:pub struct AvailabilityProofData {
+  savitri-consensus/src/types/proposal.rs:123:pub struct GroupProofData {
+  savitri-consensus/src/types/proposal.rs:142:pub struct ProposalMetadata {
+  savitri-consensus/src/types/proposal.rs:157:pub enum ProposalType {
+  savitri-consensus/src/types/proposal.rs:173:pub struct ProposalValidationResult {
+  savitri-consensus/src/types/proposal.rs:188:pub struct ValidationDetail {
+  savitri-consensus/src/types/proposal.rs:200:pub trait Proposal: Send + Sync + std::any::Any {
+  savitri-consensus/src/types/proposal.rs:311:pub enum ProposalValidationError {
+  savitri-consensus/src/types/score.rs:16:pub type PouScore = u16;
+  savitri-consensus/src/types/score.rs:19:pub const POU_SCORE_MAX: PouScore = 1000;
+  savitri-consensus/src/types/score.rs:22:pub const POU_SCORE_MIN: PouScore = 0;
+  savitri-consensus/src/types/score.rs:25:pub const POU_SCORE_DEFAULT: PouScore = 500;
+  savitri-consensus/src/types/score.rs:32:pub struct ScoreComponents {
+  savitri-consensus/src/types/score.rs:55:pub struct PouScoreResult {
+  savitri-consensus/src/types/score.rs:76:pub struct ScoreConfig {
+  savitri-consensus/src/types/score.rs:105:pub struct LatencyMeasurement {
+  savitri-consensus/src/types/score.rs:118:pub enum LatencyType {
+  savitri-consensus/src/types/score.rs:134:pub struct AvailabilityMeasurement {
+  savitri-consensus/src/types/score.rs:149:pub struct IntegrityMeasurement {
+  savitri-consensus/src/types/score.rs:171:pub struct GeographicInfo {
+  savitri-consensus/src/types/score.rs:191:pub struct PerformanceMetrics {
+  savitri-consensus/src/types/score.rs:210:pub struct ReputationInfo {
+  savitri-consensus/src/types/score.rs:227:pub struct ScoreSnapshot {
+  savitri-consensus/src/types/score.rs:242:pub struct ScoreGlobalStats {
+  savitri-consensus/src/types/score.rs:257:pub struct ScoreDistribution {
+  savitri-consensus/src/types/score.rs:271:pub trait ScoreCalculator: Send + Sync {
+  savitri-consensus/src/types/score.rs:298:pub struct DefaultScoreCalculator;
+  savitri-consensus/src/types/score.rs:447:pub fn format_pou_score_4dp(score: PouScore) -> String {
+  savitri-consensus/src/types/score.rs:457:pub fn compare_pou_scores(score1: PouScore, peer_id1: &str, score2: PouScore, peer_id2: &str) -> Ordering {
+  savitri-consensus/src/types/slashing.rs:13:pub enum MisbehaviorType {
+  savitri-consensus/src/types/slashing.rs:45:pub struct SlashingConfig {
+  savitri-consensus/src/types/slashing.rs:106:pub struct SlashingRecord {
+  savitri-consensus/src/types/slashing.rs:125:pub struct ValidatorSlashingState {
+  savitri-consensus/src/types/validation.rs:11:pub enum ValidationResult {
+  savitri-consensus/src/types/validation.rs:26:pub enum ValidationError {
+  savitri-consensus/src/types/validation.rs:125:pub struct ValidationContext {
+  savitri-consensus/src/types/validation.rs:146:pub struct ValidationContextData {
+  savitri-consensus/src/types/validation.rs:161:pub struct GroupInfo {
+  savitri-consensus/src/types/validation.rs:178:pub enum GroupStatus {
+  savitri-consensus/src/types/validation.rs:192:pub struct ValidationProposerInfo {
+  savitri-consensus/src/types/validation.rs:213:pub struct ScoreThresholds {
+  savitri-consensus/src/types/validation.rs:224:pub struct GeographicConstraints {
+  savitri-consensus/src/types/validation.rs:235:pub struct ValidationMetrics {
+  savitri-consensus/src/types/validation.rs:256:pub struct ValidationConfig {
+  savitri-consensus/src/types/validation.rs:496:pub trait Validation: Send + Sync {
+  savitri-consensus/src/types/validation.rs:562:pub struct DagMetrics {
+  savitri-consensus/src/utils/deterministic.rs:11:pub struct DeterministicSelector {
+  savitri-consensus/src/utils/deterministic.rs:197:pub struct GroupAssigner {
+  savitri-consensus/src/utils/deterministic.rs:256:pub struct NodeInfo {
+  savitri-consensus/src/utils/deterministic.rs:264:pub struct ProposerSelector {
+  savitri-consensus/src/validation/adaptive_validator.rs:16:pub struct AdaptiveValidator {
+  savitri-consensus/src/validation/adaptive_validator.rs:23:pub struct AdaptiveValidationConfig {
+  savitri-consensus/src/validation/adaptive_validator.rs:34:pub struct AdaptiveValidationStats {
+  savitri-consensus/src/validation/block_validator.rs:15:pub struct BlockValidator {
+  savitri-consensus/src/validation/block_validator.rs:24:pub struct BlockValidationConfig {
+  savitri-consensus/src/validation/block_validator.rs:75:pub struct BlockValidationStats {
+  savitri-consensus/src/validation/block_validator.rs:421:pub struct FastBlockValidator {
+  savitri-consensus/src/validation/block_validator.rs:488:pub struct BlockValidationUtils;
+  savitri-consensus/src/validation/group_validator.rs:15:pub struct GroupValidationConfig {
+  savitri-consensus/src/validation/group_validator.rs:48:pub struct GroupValidationStats {
+  savitri-consensus/src/validation/group_validator.rs:59:pub struct GroupState {
+  savitri-consensus/src/validation/group_validator.rs:144:pub struct GroupValidator {
+  savitri-consensus/src/validation/group_validator.rs:392:pub enum GroupRejectionReason {
+  savitri-consensus/src/validation/parallel_validator.rs:15:pub struct ParallelBlockValidator {
+  savitri-consensus/src/validation/parallel_validator.rs:21:pub struct ParallelValidationConfig {
+  savitri-consensus/src/validation/parallel_validator.rs:30:pub struct ParallelValidationStats {
+  savitri-consensus/src/validation/proposal_validator.rs:17:pub struct ProposalValidationConfig {
+  savitri-consensus/src/validation/proposal_validator.rs:50:pub struct ProposalValidationStats {
+  savitri-consensus/src/validation/proposal_validator.rs:61:pub struct ProposalValidator {
+  savitri-consensus/src/validation/proposal_validator.rs:294:pub enum ProposalRejectionReason {
+  savitri-consensus/src/validation/score_validator.rs:20:pub struct ScoreValidationConfig {
+  savitri-consensus/src/validation/score_validator.rs:59:pub struct ScoreValidationStats {
+  savitri-consensus/src/validation/score_validator.rs:72:pub struct NodeScore {
+  savitri-consensus/src/validation/score_validator.rs:114:pub struct ScoreValidator {
+  savitri-consensus/src/validation/signature_validator.rs:13:pub trait SignatureValidator: Send + Sync {
+  savitri-consensus/src/validation/signature_validator.rs:31:pub struct DefaultSignatureValidator {
+  savitri-consensus/src/validation/signature_validator.rs:38:pub struct SignatureValidationConfig {
+  savitri-consensus/src/validation/signature_validator.rs:68:pub struct SignatureValidationStats {
+  savitri-consensus/src/validation/signature_validator.rs:274:pub struct BatchSignatureValidator {
+  savitri-consensus/src/validation/signature_validator.rs:282:pub struct BatchValidationStats {
+  savitri-consensus/src/validation/signature_validator.rs:404:pub struct SignatureData {
+  savitri-consensus/src/validation/signature_validator.rs:411:pub struct MockSignatureValidator;
+  savitri-consensus/src/validation/signature_validator.rs:437:pub struct SignatureValidationUtils;
+
+## savitri-mempool
+  savitri-mempool/src/core/account.rs:7:pub struct Account {
+  savitri-mempool/src/core/tx.rs:6:pub struct SignedTx {
+  savitri-mempool/src/core/tx.rs:20:pub struct CallTransaction {
+  savitri-mempool/src/core/tx.rs:65:pub fn hash_signed_tx_bytes(tx: &[u8]) -> Vec<u8> {
+  savitri-mempool/src/core/tx.rs:73:pub fn deserialize_signed_tx(data: &[u8]) -> Result<SignedTx, Box<dyn std::error::Error>> {
+  savitri-mempool/src/core/tx.rs:77:pub fn deserialize_call_tx(data: &[u8]) -> Result<CallTransaction, Box<dyn std::error::Error>> {
+  savitri-mempool/src/core/types.rs:6:pub struct TransactionMetadata {
+  savitri-mempool/src/executor/dispatcher.rs:19:pub fn hash_signed_tx_bytes(tx_bytes: &[u8]) -> [u8; 32] {
+  savitri-mempool/src/executor/dispatcher.rs:29:pub fn hash_transaction(tx: &SignedTx) -> [u8; 32] {
+  savitri-mempool/src/executor/dispatcher.rs:40:pub enum SchedulingError {
+  savitri-mempool/src/executor/dispatcher.rs:74:pub struct MempoolState {
+  savitri-mempool/src/executor/dispatcher.rs:87:pub struct AdaptiveWeightsConfig {
+  savitri-mempool/src/executor/dispatcher.rs:126:pub struct AdaptiveWeights {
+  savitri-mempool/src/executor/dispatcher.rs:630:pub struct FeeStatistics {
+  savitri-mempool/src/executor/dispatcher.rs:638:pub struct DispatcherConfig {
+  savitri-mempool/src/executor/dispatcher.rs:680:pub struct ExecutionDispatcher {
+  savitri-mempool/src/executor/dispatcher.rs:692:pub struct DispatcherMetrics {
+  savitri-mempool/src/executor/dispatcher.rs:704:pub struct SimpleTransactionValidator {
+  savitri-mempool/src/executor/nonce_conflict_resolver.rs:12:pub enum ConflictResolutionStrategy {
+  savitri-mempool/src/executor/nonce_conflict_resolver.rs:24:pub struct NonceConflictResolver {
+  savitri-mempool/src/executor/nonce_conflict_resolver.rs:35:pub struct ConflictResolutionStats {
+  savitri-mempool/src/executor/nonce_conflict_resolver.rs:325:pub struct ConflictAnalysis {
+  savitri-mempool/src/executor/prefetcher.rs:16:pub struct PipelinePrefetcher {
+  savitri-mempool/src/executor/prefetcher.rs:32:pub struct PrefetchedTransaction {
+  savitri-mempool/src/executor/prefetcher.rs:41:pub struct AccountState {
+  savitri-mempool/src/executor/prefetcher.rs:377:pub struct PrefetchStats {
+  savitri-mempool/src/executor/score_cache.rs:38:pub struct ScoreCache {
+  savitri-mempool/src/executor/transaction_validator.rs:22:pub struct DalekPublicKeyWrapper {
+  savitri-mempool/src/executor/transaction_validator.rs:47:pub struct DalekSignatureWrapper {
+  savitri-mempool/src/executor/transaction_validator.rs:84:pub trait TransactionMessage {
+  savitri-mempool/src/executor/transaction_validator.rs:114:pub enum ValidationResult {
+  savitri-mempool/src/executor/transaction_validator.rs:131:pub enum ValidationError {
+  savitri-mempool/src/executor/transaction_validator.rs:153:pub struct ValidatorConfig {
+  savitri-mempool/src/executor/transaction_validator.rs:183:pub struct TransactionValidator {
+  savitri-mempool/src/executor/transaction_validator.rs:553:pub struct ValidatorStats {
+  savitri-mempool/src/fee/dual_token_engine.rs:4:pub struct DualTokenFeeEngine {
+  savitri-mempool/src/fee/dual_token_engine.rs:9:pub struct DynamicFeeParams {
+  savitri-mempool/src/fee/dual_token_engine.rs:15:pub struct NetworkMetrics {
+  savitri-mempool/src/fee/dual_token_engine.rs:25:pub struct FeeCalculationResult {
+  savitri-mempool/src/group_aware_selection.rs:17:pub struct GroupAwareSelectionConfig {
+  savitri-mempool/src/group_aware_selection.rs:50:pub struct GroupTransactionPool {
+  savitri-mempool/src/group_aware_selection.rs:61:pub struct PrioritizedTransaction {
+  savitri-mempool/src/group_aware_selection.rs:71:pub enum TransactionPriority {
+  savitri-mempool/src/group_aware_selection.rs:80:pub struct SelectionStats {
+  savitri-mempool/src/group_aware_selection.rs:92:pub struct GroupAwareTransactionSelector {
+  savitri-mempool/src/group_aware_selection.rs:563:pub struct SenderAffinityRouter {
+  savitri-mempool/src/group_validation.rs:17:pub struct GroupValidationConfig {
+  savitri-mempool/src/group_validation.rs:53:pub struct ValidationResult {
+  savitri-mempool/src/group_validation.rs:65:pub enum ValidationError {
+  savitri-mempool/src/group_validation.rs:98:pub struct GroupMemberInfo {
+  savitri-mempool/src/group_validation.rs:109:pub struct ValidationStats {
+  savitri-mempool/src/group_validation.rs:120:pub struct GroupTransactionValidator {
+  savitri-mempool/src/mempool/admission.rs:15:pub struct AdmissionConfig {
+  savitri-mempool/src/mempool/admission.rs:122:pub enum AdmissionResult {
+  savitri-mempool/src/mempool/admission.rs:132:pub struct AdmissionControl {
+  savitri-mempool/src/mempool/core.rs:16:pub enum AdmissionOutcome {
+  savitri-mempool/src/mempool/core.rs:32:pub struct MempoolConfig {
+  savitri-mempool/src/mempool/core.rs:79:pub struct Mempool {
+  savitri-mempool/src/mempool/core.rs:884:pub struct MempoolWithBackgroundPurge {
+  savitri-mempool/src/mempool/dual_token_integration.rs:129:pub struct DualTokenFeeEngine {
+  savitri-mempool/src/mempool/dual_token_integration.rs:167:pub struct DynamicFeeParams {
+  savitri-mempool/src/mempool/dual_token_integration.rs:182:pub struct NetworkMetrics {
+  savitri-mempool/src/mempool/dual_token_integration.rs:201:pub struct FeeCalculationResult {
+  savitri-mempool/src/mempool/dual_token_integration.rs:214:pub enum DualTokenTransactionError {
+  savitri-mempool/src/mempool/dual_token_integration.rs:251:pub struct FeeBurnInfo {
+  savitri-mempool/src/mempool/dual_token_integration.rs:260:pub struct DualTokenStats {
+  savitri-mempool/src/mempool/dual_token_integration.rs:273:pub struct DualTokenMempoolIntegration {
+  savitri-mempool/src/mempool/hybrid.rs:24:pub struct CrossShardCoordinator {
+  savitri-mempool/src/mempool/hybrid.rs:36:pub struct ShardRouter {
+  savitri-mempool/src/mempool/hybrid.rs:46:pub struct LoadBalancer {
+  savitri-mempool/src/mempool/hybrid.rs:53:pub struct ShardHealthChecker {
+  savitri-mempool/src/mempool/hybrid.rs:60:pub enum LoadBalancingAlgorithm {
+  savitri-mempool/src/mempool/hybrid.rs:69:pub struct ShardingConfig {
+  savitri-mempool/src/mempool/hybrid.rs:82:pub enum RoutingStrategy {
+  savitri-mempool/src/mempool/hybrid.rs:90:pub struct TwoPcStatus {
+  savitri-mempool/src/mempool/hybrid.rs:98:pub enum StatusType {
+  savitri-mempool/src/mempool/hybrid.rs:354:pub enum CoordinatorStatus {
+  savitri-mempool/src/mempool/hybrid.rs:441:pub fn deserialize_call_tx(bytes: &[u8]) -> Result<CallTransaction, &'static str> {
+  savitri-mempool/src/mempool/hybrid.rs:479:pub fn deserialize_signed_tx(bytes: &[u8]) -> Result<SignedTx, &'static str> {
+  savitri-mempool/src/mempool/hybrid.rs:533:pub struct SignedTx {
+  savitri-mempool/src/mempool/hybrid.rs:551:pub struct CallTransaction {
+  savitri-mempool/src/mempool/hybrid.rs:571:pub struct MempoolTransfer {
+  savitri-mempool/src/mempool/hybrid.rs:586:pub struct TransferMetrics {
+  savitri-mempool/src/mempool/hybrid.rs:780:pub struct HybridMempoolPipeline {
+  savitri-mempool/src/mempool/integration.rs:190:pub struct MempoolStateTracker {
+  savitri-mempool/src/mempool/integration.rs:318:pub struct MempoolAggregateStats {
+  savitri-mempool/src/mempool/integration.rs:336:pub struct MempoolStatsSnapshot {
+  savitri-mempool/src/mempool/integration.rs:359:pub struct IoTBatchingMetrics {
+  savitri-mempool/src/mempool/integration.rs:451:pub enum TransactionProcessError {
+  savitri-mempool/src/mempool/integration.rs:505:pub struct MempoolPipeline {
+  savitri-mempool/src/mempool/integration.rs:573:pub struct ShardFilter {
+  savitri-mempool/src/mempool/integration.rs:2826:pub fn bytes_to_raw_tx(bytes: Vec<u8>, peer_id: Option<u64>) -> RawTx {
+  savitri-mempool/src/mempool/integration.rs:2840:pub fn get_tx_bytes_from_handles(
+  savitri-mempool/src/mempool/metrics.rs:20:pub fn set_mempool_size(size: u64) {
+  savitri-mempool/src/mempool/metrics.rs:26:pub fn get_mempool_size() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:31:pub fn set_pending_tx_count(count: u64) {
+  savitri-mempool/src/mempool/metrics.rs:37:pub fn get_pending_tx_count() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:42:pub fn set_ready_tx_count(count: u64) {
+  savitri-mempool/src/mempool/metrics.rs:48:pub fn get_ready_tx_count() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:53:pub fn increment_admission() {
+  savitri-mempool/src/mempool/metrics.rs:60:pub fn increment_rejection() {
+  savitri-mempool/src/mempool/metrics.rs:82:pub fn get_admission_rate() -> f64 {
+  savitri-mempool/src/mempool/metrics.rs:95:pub fn get_admission_count() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:100:pub fn get_rejection_rate() -> f64 {
+  savitri-mempool/src/mempool/metrics.rs:113:pub fn get_rejection_count() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:118:pub fn set_mempool_size_bytes(size_bytes: u64) {
+  savitri-mempool/src/mempool/metrics.rs:124:pub fn get_mempool_size_bytes() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:129:pub fn increment_removal() {
+  savitri-mempool/src/mempool/metrics.rs:135:pub fn increment_removal_batch(count: u64) {
+  savitri-mempool/src/mempool/metrics.rs:141:pub fn increment_eviction() {
+  savitri-mempool/src/mempool/metrics.rs:148:pub fn get_eviction_count() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:153:pub fn get_removal_count() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:161:pub fn increment_confirmed_batch(count: u64) {
+  savitri-mempool/src/mempool/metrics.rs:167:pub fn get_confirmed_count() -> u64 {
+  savitri-mempool/src/mempool/metrics.rs:172:pub fn update_mempool_metrics(size: u64, pending: u64, ready: u64) {
+  savitri-mempool/src/mempool/mod.rs:39:pub struct PurgeMetrics {
+  savitri-mempool/src/mempool/mod.rs:51:pub enum TxIngestError {
+  savitri-mempool/src/mempool/prevalidation.rs:72:pub struct TransactionWithCalldata {
+  savitri-mempool/src/mempool/prevalidation.rs:111:pub fn hash_signed_tx_bytes(bytes: &[u8]) -> [u8; 32] {
+  savitri-mempool/src/mempool/prevalidation.rs:134:pub struct VerifiedTx {
+  savitri-mempool/src/mempool/prevalidation.rs:175:pub struct OracleValidator {
+  savitri-mempool/src/mempool/prevalidation.rs:188:pub struct OracleConfig {
+  savitri-mempool/src/mempool/prevalidation.rs:262:pub struct SigVerifyStage {
+  savitri-mempool/src/mempool/prevalidation.rs:271:pub struct SigVerifyConfig {
+  savitri-mempool/src/mempool/prevalidation.rs:527:pub struct AccountSnapshot {
+  savitri-mempool/src/mempool/prevalidation.rs:592:pub struct AccountSnapshotState {
+  savitri-mempool/src/mempool/prevalidation.rs:914:pub enum PrevalidationResult {
+  savitri-mempool/src/mempool/prevalidation.rs:921:pub struct SenderRegistry {
+  savitri-mempool/src/mempool/prevalidation.rs:981:pub struct TxStorage {
+  savitri-mempool/src/mempool/prevalidation.rs:1031:pub struct Prevalidator {
+  savitri-mempool/src/mempool/queued_pool.rs:22:pub struct QueuedPoolConfig {
+  savitri-mempool/src/mempool/queued_pool.rs:51:pub struct QueuedTx {
+  savitri-mempool/src/mempool/queued_pool.rs:90:pub struct QueuedPoolStats {
+  savitri-mempool/src/mempool/queued_pool.rs:100:pub struct QueuedPool {
+  savitri-mempool/src/mempool/queued_pool.rs:367:pub enum QueuedPoolError {
+  savitri-mempool/src/mempool/replay_prevention.rs:17:pub struct ReplayPreventionConfig {
+  savitri-mempool/src/mempool/replay_prevention.rs:64:pub struct ReplayPrevention {
+  savitri-mempool/src/mempool/replay_prevention.rs:311:pub struct ReplayPreventionStats {
+  savitri-mempool/src/mempool/replay_prevention.rs:326:pub enum ReplayPreventionError {
+  savitri-mempool/src/mempool/sharded.rs:51:pub trait MempoolInterface {
+  savitri-mempool/src/mempool/sharded.rs:75:pub struct MempoolShard {
+  savitri-mempool/src/mempool/sharded.rs:428:pub struct ShardBatch {
+  savitri-mempool/src/mempool/sharded.rs:438:pub struct ShardedMempool {
+  savitri-mempool/src/mempool/simple_tests.rs:16:pub struct SignedTx {
+  savitri-mempool/src/mempool/simple_tests.rs:28:pub struct CallTransaction {
+  savitri-mempool/src/mempool/simple_tests.rs:38:pub fn hash_signed_tx_bytes(_bytes: &[u8]) -> [u8; 32] {
+  savitri-mempool/src/mempool/simple_tests.rs:44:pub struct SimplePendingTx {
+  savitri-mempool/src/mempool/simple_tests.rs:53:pub struct SimpleAtomicNonceResolver {
+  savitri-mempool/src/mempool/tests.rs:20:pub struct PendingQueueConfig {
+  savitri-mempool/src/mempool/tests.rs:41:pub struct PendingTx {
+  savitri-mempool/src/mempool/tests.rs:60:pub struct AtomicNonceResolver {
+  savitri-mempool/src/mempool/tests.rs:73:pub struct AtomicNonceResolverStats {
+  savitri-mempool/src/mempool/tests.rs:231:pub struct AtomicExecutionDispatcher {
+  savitri-mempool/src/mempool/types.rs:10:pub enum TxClass {
+  savitri-mempool/src/mempool/types.rs:129:pub type SenderId = u32;
+  savitri-mempool/src/mempool/types.rs:134:pub struct TxHandle(pub u64);
+  savitri-mempool/src/mempool/types.rs:139:pub struct PrevalidatedTx {
+  savitri-mempool/src/mempool/types.rs:160:pub struct MempoolTx {
+  savitri-mempool/src/mempool/types.rs:301:pub struct RawTx {
+  savitri-mempool/src/mempool/types.rs:312:pub struct CallTransaction {
+  savitri-mempool/src/mempool/types.rs:399:pub struct PipelinePrefetcher;
+  savitri-mempool/src/mempool/types.rs:408:pub struct SignedTx {
+  savitri-mempool/src/mempool/types.rs:542:pub fn create_default_signed_tx() -> SignedTx {
+  savitri-mempool/src/mempool/types.rs:556:pub struct SigVerifyStage;
+  savitri-mempool/src/mempool/types.rs:565:pub struct OracleValidator {
+  savitri-mempool/src/mempool/types.rs:570:pub struct OracleConfig {
+  savitri-mempool/src/mempool/types.rs:590:pub trait MemoryStorageExt {
+  savitri-mempool/src/oracle/config.rs:6:pub struct OracleConfig {
+  savitri-mempool/src/oracle/integration.rs:11:pub struct OracleIntegration {
+  savitri-mempool/src/oracle/integration.rs:26:pub struct OracleData {
+  savitri-mempool/src/oracle/integration.rs:34:pub struct PriceFeed {
+  savitri-mempool/src/oracle/integration.rs:198:pub fn is_oracle_feed_tx(tx: &[u8]) -> bool {
+  savitri-mempool/src/oracle/integration.rs:210:pub fn extract_oracle_data(tx: &[u8]) -> Result<PriceFeed, OracleError> {
+  savitri-mempool/src/oracle/integration.rs:233:pub enum OracleError {
+  savitri-mempool/src/oracle/integration.rs:258:pub struct OracleStats {
+  savitri-mempool/src/oracle/mod.rs:15:pub struct PriceOracle {
+  savitri-mempool/src/oracle/validator.rs:9:pub struct OracleValidator {
+  savitri-mempool/src/oracle/validator.rs:292:pub struct ValidationStats {
+  savitri-mempool/src/proposer_pool.rs:18:pub struct ProposerPoolConfig {
+  savitri-mempool/src/proposer_pool.rs:48:pub struct ProposerTransactionPool {
+  savitri-mempool/src/proposer_pool.rs:59:pub struct ProposerPoolStats {
+  savitri-mempool/src/proposer_pool.rs:70:pub struct ProposerPoolManager {
+  savitri-mempool/src/sharding/coordinator.rs:6:pub struct CrossShardCoordinator {
+  savitri-mempool/src/sharding/coordinator.rs:34:pub struct RoutedTransaction {
+  savitri-mempool/src/sharding/coordinator.rs:39:pub enum TwoPcStatus {
+  savitri-mempool/src/sharding/router.rs:4:pub struct ShardRouter {
+  savitri-mempool/src/sharding/router.rs:9:pub struct RoutingResult {
+  savitri-mempool/src/sharding/router.rs:17:pub struct ShardAssignment {
+  savitri-mempool/src/sharding/router.rs:78:pub struct ShardingConfig {
+  savitri-mempool/src/sigverify.rs:10:pub enum SigVerifyStage {
+  savitri-mempool/src/sigverify.rs:74:pub struct VerifiedTx {
+  savitri-mempool/src/sigverify.rs:85:pub fn verify_signature(signature: &[u8], message: &[u8], public_key: &[u8]) -> Result<(), String> {
+  savitri-mempool/src/sigverify.rs:132:pub struct BatchVerifier {
+  savitri-mempool/src/storage/mod.rs:11:pub struct LockFreeStorage {
+  savitri-mempool/src/storage/mod.rs:112:pub trait StorageInterface: Send + Sync {
+  savitri-mempool/src/storage/mod.rs:196:pub type Storage = dyn StorageTraitInterface;
+  savitri-mempool/src/storage/mod.rs:198:pub trait StorageTraitInterface: Send + Sync {
+  savitri-mempool/src/storage/mod.rs:282:pub enum StorageError {
+  savitri-mempool/src/storage/mod.rs:301:pub struct MemoryStorage {
+
+## savitri-core
+  savitri-core/src/compression.rs:11:pub enum CompressionAlgorithm {
+  savitri-core/src/compression.rs:30:pub struct CompressionConfig {
+  savitri-core/src/compression.rs:50:pub fn compress(data: &[u8], config: &CompressionConfig) -> Result<Vec<u8>> {
+  savitri-core/src/compression.rs:64:pub fn decompress(compressed_data: &[u8], algorithm: CompressionAlgorithm) -> Result<Vec<u8>> {
+  savitri-core/src/core/block.rs:10:pub struct Block {
+  savitri-core/src/core/block.rs:304:pub struct BlockSummary {
+  savitri-core/src/core/config.rs:8:pub trait ValidateConfig {
+  savitri-core/src/core/config.rs:24:pub fn validate_port(port: u16, field_name: &str) -> Result<()> {
+  savitri-core/src/core/config.rs:33:pub fn validate_path_exists(path: &std::path::Path, field_name: &str) -> Result<()> {
+  savitri-core/src/core/config.rs:48:pub fn validate_non_empty(value: &str, field_name: &str) -> Result<()> {
+  savitri-core/src/core/config.rs:56:pub fn validate_positive<T>(value: T, field_name: &str) -> Result<()>
+  savitri-core/src/core/config.rs:67:pub fn validate_array_non_empty<T: AsRef<str>>(
+  savitri-core/src/core/config.rs:80:pub fn validate_array_not_empty<T>(array: &[T], field_name: &str) -> Result<()> {
+  savitri-core/src/core/config.rs:88:pub fn validate_range<T: PartialOrd + std::fmt::Display>(
+  savitri-core/src/core/crypto.rs:12:pub type Keypair = SigningKey;
+  savitri-core/src/core/crypto.rs:13:pub type PublicKey = VerifyingKey;
+  savitri-core/src/core/crypto.rs:25:pub fn compute_tx_root(txs: &[Transaction]) -> [u8; 64] {
+  savitri-core/src/core/crypto.rs:57:pub fn generate_keypair() -> Keypair {
+  savitri-core/src/core/crypto.rs:63:pub fn sign_data(keypair: &Keypair, data: &[u8]) -> Signature {
+  savitri-core/src/core/crypto.rs:68:pub fn verify_signature(pubkey: &PublicKey, data: &[u8], sig: &Signature) -> bool {
+  savitri-core/src/core/crypto.rs:73:pub fn address_to_publickey(address: &[u8; 32]) -> anyhow::Result<PublicKey> {
+  savitri-core/src/core/crypto.rs:88:pub struct IdentityKeypair {
+  savitri-core/src/core/crypto.rs:171:pub fn load_or_generate_identity() -> IdentityKeypair {
+  savitri-core/src/core/crypto.rs:210:pub fn load_identity_from_path<P: AsRef<Path>>(path: P) -> anyhow::Result<IdentityKeypair> {
+  savitri-core/src/core/crypto.rs:216:pub fn save_identity_to_path<P: AsRef<Path>>(kp: &IdentityKeypair, path: P) -> anyhow::Result<()> {
+  savitri-core/src/core/crypto.rs:223:pub fn generate_identity() -> IdentityKeypair {
+  savitri-core/src/core/crypto.rs:230:pub fn validate_identity_keypair(kp: &IdentityKeypair) -> Result<(), String> {
+  savitri-core/src/core/crypto.rs:252:pub fn identity_to_libp2p_keypair(identity: IdentityKeypair) -> anyhow::Result<libp2p::identity::Keypair> {
+  savitri-core/src/core/crypto.rs:266:pub fn libp2p_keypair_to_identity(keypair: libp2p::identity::Keypair) -> IdentityKeypair {
+  savitri-core/src/core/crypto.rs:283:pub fn peer_id_from_public_key_bytes(pubkey_bytes: &[u8]) -> anyhow::Result<String> {
+  savitri-core/src/core/crypto.rs:512:pub fn hash_tx(tx: &super::types::Transaction) -> [u8; 64] {
+  savitri-core/src/core/executor/cache.rs:10:pub struct ExecutorAccountCache {
+  savitri-core/src/core/executor_callbacks.rs:21:pub struct CallbackTriggeredEvent {
+  savitri-core/src/core/executor_callbacks.rs:39:pub struct CallbackQueue {
+  savitri-core/src/core/executor_dag_metrics.rs:13:pub struct ParallelDAGMetrics {
+  savitri-core/src/core/executor_dag_metrics.rs:71:pub struct DAGExecutionMetrics {
+  savitri-core/src/core/executor_dag_metrics.rs:80:pub struct GlobalDAGMetrics {
+  savitri-core/src/core/executor_dag_metrics.rs:164:pub enum LogLevel {
+  savitri-core/src/core/executor_dag_metrics.rs:171:pub fn export_prometheus_metrics(metrics: &ParallelDAGMetrics) -> String {
+  savitri-core/src/core/genesis.rs:10:pub fn compute_tx_root(txs: &[&[u8]]) -> [u8; 32] {
+  savitri-core/src/core/genesis.rs:18:pub fn sign_data(data: &[u8], key: &[u8]) -> Vec<u8> {
+  savitri-core/src/core/genesis.rs:28:pub fn verify_signature(data: &[u8], signature: &[u8], public_key: &[u8]) -> bool {
+  savitri-core/src/core/genesis.rs:59:pub struct SupplyManager {
+  savitri-core/src/core/genesis.rs:149:pub fn load_genesis_block() -> Result<Block> {
+  savitri-core/src/core/genesis.rs:185:pub fn ensure_genesis_block(storage: &Storage) -> Result<()> {
+  savitri-core/src/core/genesis.rs:355:pub fn create_test_genesis_block() -> Result<Block> {
+  savitri-core/src/core/genesis.rs:374:pub fn validate_genesis_block(block: &Block) -> Result<()> {
+  savitri-core/src/core/genesis.rs:418:pub fn get_genesis_hash() -> Result<[u8; 64]> {
+  savitri-core/src/core/genesis.rs:424:pub fn get_genesis_timestamp() -> Result<u64> {
+  savitri-core/src/core/genesis.rs:430:pub fn get_genesis_proposer() -> Result<[u8; 32]> {
+  savitri-core/src/core/genesis.rs:436:pub fn get_genesis_state_root() -> Result<[u8; 64]> {
+  savitri-core/src/core/genesis.rs:442:pub fn is_genesis_block(block: &Block) -> bool {
+  savitri-core/src/core/genesis.rs:447:pub fn get_genesis_transactions() -> Result<Vec<Transaction>> {
+  savitri-core/src/core/genesis.rs:453:pub fn get_genesis_tx_root() -> Result<[u8; 64]> {
+  savitri-core/src/core/genesis.rs:459:pub fn create_genesis_from_transactions(
+  savitri-core/src/core/genesis.rs:485:pub fn initialize_accounts_from_genesis(storage: &Storage) -> Result<()> {
+  savitri-core/src/core/genesis.rs:527:pub fn get_initial_supply() -> Result<u128> {
+  savitri-core/src/core/genesis.rs:544:pub fn is_genesis_address(address: &str) -> Result<bool> {
+  savitri-core/src/core/genesis.rs:557:pub fn get_genesis_addresses() -> Result<Vec<String>> {
+  savitri-core/src/core/genesis.rs:570:pub fn get_genesis_version() -> Result<u8> {
+  savitri-core/src/core/genesis.rs:576:pub fn create_dev_genesis_block() -> Result<Block> {
+  savitri-core/src/core/genesis.rs:614:pub fn verify_genesis_signature(block: &Block) -> Result<bool> {
+  savitri-core/src/core/genesis.rs:639:pub fn compute_genesis_hash(block: &Block) -> [u8; 64] {
+  savitri-core/src/core/genesis.rs:644:pub fn export_genesis_to_json() -> Result<String> {
+  savitri-core/src/core/genesis.rs:650:pub fn import_genesis_from_json(json: &str) -> Result<Block> {
+  savitri-core/src/core/genesis.rs:655:pub fn reset_genesis_block(storage: &Storage) -> Result<()> {
+  savitri-core/src/core/genesis.rs:667:pub fn genesis_block_exists(storage: &Storage) -> Result<bool> {
+  savitri-core/src/core/genesis.rs:676:pub fn get_genesis_block_from_storage(storage: &Storage) -> Result<Option<Block>> {
+  savitri-core/src/core/genesis.rs:694:pub fn validate_genesis_in_storage(storage: &Storage) -> Result<bool> {
+  savitri-core/src/core/genesis.rs:703:pub fn initialize_genesis_state(storage: &Storage) -> Result<()> {
+  savitri-core/src/core/genesis.rs:728:pub struct GenesisMetadata {
+  savitri-core/src/core/genesis.rs:738:pub fn get_genesis_metadata(storage: &Storage) -> Result<Option<GenesisMetadata>> {
+  savitri-core/src/core/genesis.rs:756:pub fn is_genesis_initialized(storage: &Storage) -> Result<bool> {
+  savitri-core/src/core/identity.rs:16:pub struct PeerId(pub Vec<u8>);
+  savitri-core/src/core/identity.rs:33:pub struct IdentityMapping {
+  savitri-core/src/core/identity.rs:40:pub struct ConsensusPubkey {
+  savitri-core/src/core/identity.rs:52:pub enum HandshakeMessage {
+  savitri-core/src/core/identity.rs:72:pub struct IdentityRegistry {
+  savitri-core/src/core/identity.rs:113:pub struct HandshakeManager {
+  savitri-core/src/core/monolith.rs:15:pub struct MonolithPolicy {
+  savitri-core/src/core/monolith.rs:57:pub struct MonolithHeader {
+  savitri-core/src/core/monolith.rs:352:pub struct MonolithSummary {
+  savitri-core/src/core/monolith.rs:370:pub fn compute_monolith_id(
+  savitri-core/src/core/monolith.rs:386:pub fn generate_monolith(
+  savitri-core/src/core/monolith.rs:425:pub fn compute_state_commit_from_blocks(blocks: &[Block]) -> [u8; 64] {
+  savitri-core/src/core/monolith.rs:452:pub fn headers_commit_from_hashes(hashes: &[[u8; 64]]) -> Result<[u8; 64]> {
+  savitri-core/src/core/monolith.rs:464:pub fn generate_proof_commit(blocks: &[Block]) -> Result<[u8; 64]> {
+  savitri-core/src/core/monolith.rs:477:pub fn verify_headers_commit(hashes: &[[u8; 64]], commit: &[u8; 64]) -> Result<bool> {
+  savitri-core/src/core/monolith.rs:483:pub fn verify_monolith_proof(
+  savitri-core/src/core/monolith.rs:515:pub fn generate_proof_bytes(blocks: &[Block]) -> Result<Vec<u8>> {
+  savitri-core/src/core/monolith.rs:521:pub fn validate_monolith_chain(monoliths: &[MonolithHeader]) -> Result<()> {
+  savitri-core/src/core/monolith.rs:553:pub fn get_monolith_chain_height(monoliths: &[MonolithHeader]) -> u64 {
+  savitri-core/src/core/monolith.rs:558:pub fn get_monolith_chain_coverage(monoliths: &[MonolithHeader]) -> u64 {
+  savitri-core/src/core/monolith.rs:574:pub fn find_monolith_by_height(monoliths: &[MonolithHeader], height: u64) -> Option<&MonolithHeader> {
+  savitri-core/src/core/monolith.rs:581:pub fn get_monoliths_in_range(
+  savitri-core/src/core/monolith.rs:592:pub fn filter_monoliths_by_epoch(monoliths: &[MonolithHeader], epoch_id: u64) -> Vec<&MonolithHeader> {
+  savitri-core/src/core/monolith.rs:597:pub fn filter_monoliths_by_producer<'a>(monoliths: &'a [MonolithHeader], producer: &'a [u8; 32]) -> Vec<&'a MonolithHeader> {
+  savitri-core/src/core/monolith.rs:602:pub fn get_monolith_stats(monoliths: &[MonolithHeader]) -> MonolithStats {
+  savitri-core/src/core/monolith.rs:635:pub struct MonolithStats {
+  savitri-core/src/core/monolith.rs:648:pub fn create_test_monolith() -> MonolithHeader {
+  savitri-core/src/core/monolith.rs:666:pub fn create_genesis_monolith(producer: [u8; 32]) -> MonolithHeader {
+  savitri-core/src/core/monolith.rs:684:pub fn validate_monolith_policy(policy: &MonolithPolicy) -> Result<()> {
+  savitri-core/src/core/monolith.rs:707:pub fn default_monolith_policy() -> MonolithPolicy {
+  savitri-core/src/core/monolith.rs:712:pub fn needs_cosignatures(monolith: &MonolithHeader, required_count: usize) -> bool {
+  savitri-core/src/core/monolith.rs:717:pub fn add_cosignatures(monolith: &mut MonolithHeader, cosignatures: Vec<Vec<u8>>) {
+  savitri-core/src/core/monolith.rs:724:pub fn format_monolith_age(age_ms: u64) -> String {
+  savitri-core/src/core/monolith.rs:742:pub fn get_formatted_age(monolith: &MonolithHeader) -> String {
+  savitri-core/src/core/monolith.rs:747:pub fn is_stale(monolith: &MonolithHeader, stale_duration_ms: u64) -> bool {
+  savitri-core/src/core/monolith.rs:752:pub fn get_monoliths_needing_cosignatures(
+  savitri-core/src/core/monolith.rs:760:pub fn get_monoliths_by_age(monoliths: &[MonolithHeader], max_age_ms: u64) -> Vec<&MonolithHeader> {
+  savitri-core/src/core/monolith.rs:765:pub fn sort_monoliths_by_height(monoliths: &mut [MonolithHeader]) {
+  savitri-core/src/core/monolith.rs:770:pub fn sort_monoliths_by_age(monoliths: &mut [MonolithHeader]) {
+  savitri-core/src/core/monolith.rs:776:pub fn get_monolith_chain_gaps(monoliths: &[MonolithHeader]) -> Vec<(u64, u64)> {
+  savitri-core/src/core/monolith.rs:792:pub fn has_chain_gaps(monoliths: &[MonolithHeader]) -> bool {
+  savitri-core/src/core/monolith.rs:797:pub fn get_coverage_percentage(monoliths: &[MonolithHeader], total_height: u64) -> f64 {
+  savitri-core/src/core/monolith.rs:807:pub fn monolith_from_summary(summary: MonolithSummary) -> Result<MonolithHeader> {
+  savitri-core/src/core/monolith.rs:921:pub fn export_monolith_to_json(monolith: &MonolithHeader) -> Result<String> {
+  savitri-core/src/core/monolith.rs:926:pub fn import_monolith_from_json(json: &str) -> Result<MonolithHeader> {
+  savitri-core/src/core/p2p_messages.rs:11:pub struct ConsensusCertificate {
+  savitri-core/src/core/p2p_messages.rs:21:pub struct ConsensusProposal {
+  savitri-core/src/core/p2p_messages.rs:39:pub struct ConsensusVote {
+  savitri-core/src/core/p2p_messages.rs:58:pub const MAX_PROPOSAL_BYTES: usize = 1024 * 64; // 64 KB
+  savitri-core/src/core/p2p_messages.rs:59:pub const MAX_TX_BYTES: usize = 1024 * 128; // 128 KB  
+  savitri-core/src/core/p2p_messages.rs:60:pub const MAX_VOTE_BYTES: usize = 1024; // 1 KB
+  savitri-core/src/core/p2p_messages.rs:64:pub enum ConsensusMessage {
+  savitri-core/src/core/receipt.rs:12:pub struct TransactionReceipt {
+  savitri-core/src/core/receipt.rs:41:pub enum TransactionStatus {
+  savitri-core/src/core/receipt.rs:151:pub struct FinalityMetrics {
+  savitri-core/src/core/receipt.rs:288:pub struct FinalityTracker {
+  savitri-core/src/core/shared_types.rs:33:pub struct NetworkMessage {
+  savitri-core/src/core/shared_types.rs:43:pub enum MessageType {
+  savitri-core/src/core/shared_types.rs:54:pub struct ConsensusData {
+  savitri-core/src/core/shared_types.rs:63:pub struct StorageKey {
+  savitri-core/src/core/shared_types.rs:69:pub struct StorageValue {
+  savitri-core/src/core/shared_types.rs:77:pub struct MempoolEntry {
+  savitri-core/src/core/shared_types.rs:86:pub struct BlockHeader {
+  savitri-core/src/core/shared_types.rs:102:pub struct NetworkConfig {
+  savitri-core/src/core/shared_types.rs:111:pub enum SavitriError {
+  savitri-core/src/core/shared_types.rs:138:pub type SavitriResult<T> = Result<T, SavitriError>;
+  savitri-core/src/core/slot_scheduler.rs:14:pub enum SlotRole {
+  savitri-core/src/core/slot_scheduler.rs:31:pub struct SlotInfo {
+  savitri-core/src/core/slot_scheduler.rs:51:pub struct SlotSchedulerConfig {
+  savitri-core/src/core/slot_scheduler.rs:91:pub struct SlotScheduler {
+  savitri-core/src/core/slot_scheduler.rs:95:pub struct SlotTicker {
+  savitri-core/src/core/tx.rs:11:pub struct Transaction {
+  savitri-core/src/core/tx.rs:23:pub struct SignedTx {
+  savitri-core/src/core/tx.rs:50:pub struct DeployTransaction {
+  savitri-core/src/core/tx.rs:61:pub struct CallTransaction {
+  savitri-core/src/core/tx.rs:86:pub struct Receipt {
+  savitri-core/src/core/tx.rs:102:pub struct ReceiptEvent {
+  savitri-core/src/core/tx.rs:113:pub struct ConstructorResult {
+  savitri-core/src/core/tx.rs:123:pub struct CallResult {
+  savitri-core/src/core/tx.rs:136:pub const MAX_TX_SIZE: usize = 1024 * 1024; // 1 MiB hard cap for serialized tx
+  savitri-core/src/core/tx.rs:140:pub const DEFAULT_FEE_LIMITS: FeeLimits = FeeLimits {
+  savitri-core/src/core/tx.rs:146:pub fn validate_transaction_signature(tx: &SignedTx) -> anyhow::Result<bool> {
+  savitri-core/src/core/tx.rs:175:pub fn create_transaction(
+  savitri-core/src/core/tx.rs:205:pub fn generate_tx_hash(tx: &Transaction) -> anyhow::Result<[u8; 32]> {
+  savitri-core/src/core/tx.rs:226:pub fn get_tx_fee(tx: &Transaction) -> u128 {
+  savitri-core/src/core/tx.rs:231:pub fn estimate_tx_gas(tx: &Transaction) -> anyhow::Result<u64> {
+  savitri-core/src/core/tx.rs:253:pub fn is_contract_deployment(tx: &Transaction) -> bool {
+  savitri-core/src/core/tx.rs:259:pub fn get_recipient(tx: &Transaction) -> &[u8] {
+  savitri-core/src/core/tx.rs:264:pub fn get_sender(tx: &Transaction) -> &[u8] {
+  savitri-core/src/core/tx.rs:269:pub fn get_value(tx: &Transaction) -> u128 {
+  savitri-core/src/core/tx.rs:274:pub fn get_nonce(tx: &Transaction) -> u64 {
+  savitri-core/src/core/tx.rs:279:pub fn set_nonce(tx: &mut Transaction, nonce: u64) {
+  savitri-core/src/core/tx.rs:284:pub fn set_fee(tx: &mut Transaction, fee: u128) {
+  savitri-core/src/core/tx.rs:289:pub fn mark_pre_verified(tx: &mut Transaction) {
+  savitri-core/src/core/tx.rs:294:pub fn is_pre_verified(tx: &Transaction) -> bool {
+  savitri-core/src/core/tx.rs:299:pub fn create_deployment_transaction(
+  savitri-core/src/core/tx.rs:326:pub fn signed_tx_to_deployment(tx: &SignedTx) -> anyhow::Result<DeployTransaction> {
+  savitri-core/src/core/tx.rs:342:pub fn deployment_to_signed_tx(deployment: &DeployTransaction) -> anyhow::Result<SignedTx> {
+  savitri-core/src/core/tx.rs:356:pub fn calculate_contract_address(deployer: &[u8], nonce: u64) -> [u8; 32] {
+  savitri-core/src/core/tx.rs:371:pub fn execute_contract_constructor(
+  savitri-core/src/core/tx.rs:436:pub fn execute_contract_call(
+  savitri-core/src/core/types.rs:8:pub struct Transaction {
+  savitri-core/src/core/types.rs:77:pub struct FeeLimits {
+  savitri-core/src/core/types.rs:115:pub struct Account {
+  savitri-core/src/core/unified_slot.rs:12:pub struct UnifiedSlotConfig {
+  savitri-core/src/core/validate.rs:16:pub struct ConsensusCertificate;
+  savitri-core/src/core/validate.rs:24:pub struct ConsensusProposal;
+  savitri-core/src/core/validate.rs:32:pub struct ConsensusVote;
+  savitri-core/src/core/validate.rs:40:pub const MAX_PROPOSAL_BYTES: usize = 1024;
+  savitri-core/src/core/validate.rs:42:pub const MAX_TX_BYTES: usize = 1024;
+  savitri-core/src/core/validate.rs:44:pub const MAX_VOTE_BYTES: usize = 512;
+  savitri-core/src/core/validate.rs:77:pub fn validate_oracle_feed_tx(
+  savitri-core/src/core/validate.rs:149:pub fn is_oracle_transaction(tx_bytes: &[u8]) -> bool {
+  savitri-core/src/core/validate.rs:163:pub struct BlockOracleValidator {
+  savitri-core/src/core/validate.rs:172:pub struct OracleConfig {
+  savitri-core/src/core/validate.rs:185:pub struct OracleSchema {
+  savitri-core/src/core/validate.rs:196:pub enum OracleFieldType {
+  savitri-core/src/core/validate.rs:293:pub fn validate_block_header(
+  savitri-core/src/core/validate.rs:402:pub fn validate_proposal_size(proposal: &ConsensusProposal) -> anyhow::Result<()> {
+  savitri-core/src/core/validate.rs:414:pub fn validate_vote_size(vote: &ConsensusVote) -> anyhow::Result<()> {
+  savitri-core/src/core/validate.rs:429:pub fn verify_block_proof_or_fallback<V>(
+  savitri-core/src/crypto/encryption.rs:19:pub struct EncryptedData {
+  savitri-core/src/crypto/encryption.rs:30:pub struct EncryptionKeyPair {
+  savitri-core/src/crypto/encryption.rs:99:pub struct SymmetricEncryption {
+  savitri-core/src/crypto/encryption.rs:164:pub struct AsymmetricEncryption;
+  savitri-core/src/crypto/encryption.rs:224:pub struct HybridEncryption;
+  savitri-core/src/crypto/hash.rs:12:pub fn hash(data: &[u8]) -> [u8; 32] {
+  savitri-core/src/crypto/key_manager.rs:13:pub type NodeId = [u8; 32];
+  savitri-core/src/crypto/key_manager.rs:17:pub enum KeyManagerError {
+  savitri-core/src/crypto/key_manager.rs:58:pub struct KeyManager {
+  savitri-core/src/crypto/mod.rs:19:pub fn compute_tx_root(txs: &[&[u8]]) -> [u8; 32] {
+  savitri-core/src/crypto/mod.rs:28:pub fn sign_data(data: &[u8], private_key: &[u8]) -> Result<Vec<u8>, String> {
+  savitri-core/src/crypto/mod.rs:47:pub fn verify_signature(data: &[u8], signature: &[u8], public_key: &[u8]) -> bool {
+  savitri-core/src/crypto/mod.rs:122:pub fn load_or_generate_identity(path: &str) -> anyhow::Result<Vec<u8>> {
+  savitri-core/src/crypto/mod.rs:155:pub fn sign_message(message: &[u8], keypair: &[u8]) -> Result<Vec<u8>, String> {
+  savitri-core/src/crypto/signature.rs:13:pub fn sign(message: &[u8], keypair: &Keypair) -> Signature {
+  savitri-core/src/crypto/signature.rs:26:pub fn verify(message: &[u8], signature: &Signature, public_key: &PublicKey) -> bool {
+  savitri-core/src/fl_robust.rs:32:pub const NORM_CLIP_THRESHOLD: f64 = 10.0;
+  savitri-core/src/fl_robust.rs:36:pub const MALICIOUS_GRADIENT_STREAK: usize = 3;
+  savitri-core/src/fl_robust.rs:39:pub const MALICIOUS_GRADIENT_THRESHOLD_PERMILLE: u16 = 200;
+  savitri-core/src/fl_robust.rs:43:pub struct ScoredGradient {
+  savitri-core/src/fl_robust.rs:51:pub fn score_gradients_vs_median(
+  savitri-core/src/fl_robust.rs:149:pub fn coordinate_wise_median(survivors: &[&Vec<f64>], dim: usize) -> Vec<f64> {
+  savitri-core/src/lib.rs:163:pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+  savitri-core/src/lib.rs:166:pub const NAME: &str = env!("CARGO_PKG_NAME");
+  savitri-core/src/lib.rs:169:pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
+  savitri-core/src/lib.rs:172:pub const DEFAULT_SLOT_DURATION_MS: u64 = 1000;
+  savitri-core/src/lib.rs:175:pub const DEFAULT_BLOCK_TIME_MS: u64 = 500;
+  savitri-core/src/lib.rs:178:pub const DEFAULT_CONSENSUS_TIMEOUT_MS: u64 = 5000;
+  savitri-core/src/lib.rs:181:pub const DEFAULT_NETWORK_TIMEOUT_MS: u64 = 30000;
+  savitri-core/src/lib.rs:184:pub const DEFAULT_METRICS_PORT: u16 = 9090;
+  savitri-core/src/lib.rs:187:pub const DEFAULT_P2P_PORT: u16 = 8333;
+  savitri-core/src/lib.rs:190:pub const DEFAULT_RPC_PORT: u16 = 8545;
+  savitri-core/src/lib.rs:193:pub const GENESIS_HEIGHT: u64 = 0;
+  savitri-core/src/lib.rs:196:pub const GENESIS_TIMESTAMP: u64 = 1000000;
+  savitri-core/src/lib.rs:199:pub const DEFAULT_BALANCE: u128 = 1_000_000_000_000_000_000; // 1000 tokens
+  savitri-core/src/lib.rs:202:pub const DEFAULT_MIN_FEE: u128 = 100_000_000_000_000; // 0.0001 tokens
+  savitri-core/src/lib.rs:205:pub const DEFAULT_MAX_FEE: u128 = 1_000_000_000_000_000_000; // 1 token
+  savitri-core/src/lib.rs:208:pub const TOKEN_DECIMALS: u8 = 18;
+  savitri-core/src/lib.rs:211:pub const WEI_PER_TOKEN: u128 = 10u128.pow(TOKEN_DECIMALS as u32);
+  savitri-core/src/lib.rs:215:pub enum CoreError {
+  savitri-core/src/lib.rs:292:pub type CoreResult<T> = Result<T, CoreError>;
+  savitri-core/src/lib.rs:295:pub trait Validate {
+  savitri-core/src/metrics/exporter.rs:23:pub struct PrometheusExporterConfig {
+  savitri-core/src/metrics/exporter.rs:49:pub struct PrometheusExporter {
+  savitri-core/src/metrics/exporter.rs:344:pub struct ExporterStats {
+  savitri-core/src/metrics/exporter.rs:358:pub struct HealthChecker {
+  savitri-core/src/metrics/exporter.rs:388:pub struct HealthStatus {
+  savitri-core/src/metrics/extended_registry.rs:24:pub struct SavitriMetricsRegistry {
+  savitri-core/src/metrics/extended_registry.rs:46:pub struct BlockchainMetrics {
+  savitri-core/src/metrics/extended_registry.rs:70:pub struct MempoolMetrics {
+  savitri-core/src/metrics/extended_registry.rs:96:pub struct NetworkMetrics {
+  savitri-core/src/metrics/extended_registry.rs:124:pub struct ExecutionMetrics {
+  savitri-core/src/metrics/extended_registry.rs:146:pub struct SystemMetrics {
+  savitri-core/src/metrics/extended_registry.rs:172:pub struct SecurityMetrics {
+  savitri-core/src/metrics/extended_registry.rs:194:pub struct TokenomicsMetrics {
+  savitri-core/src/metrics/extended_registry.rs:217:pub struct HardwareMetricsCache {
+  savitri-core/src/metrics/extended_registry.rs:581:pub struct SavitriMetricsStats {
+  savitri-core/src/metrics/manifest.rs:18:pub struct MetricsManifest {
+  savitri-core/src/metrics/manifest.rs:35:pub struct PlatformInfo {
+  savitri-core/src/metrics/manifest.rs:48:pub struct MetricCategory {
+  savitri-core/src/metrics/manifest.rs:63:pub struct MetricDefinition {
+  savitri-core/src/metrics/manifest.rs:92:pub enum MetricType {
+  savitri-core/src/metrics/manifest.rs:117:pub struct LabelDefinition {
+  savitri-core/src/metrics/manifest.rs:130:pub struct ThresholdDefinition {
+  savitri-core/src/metrics/manifest.rs:148:pub enum ThresholdType {
+  savitri-core/src/metrics/manifest.rs:166:pub struct SecurityInfo {
+  savitri-core/src/metrics/manifest.rs:178:pub struct ManifestGenerator;
+  savitri-core/src/metrics/mod.rs:245:pub struct MetricsManager {
+  savitri-core/src/metrics/mod.rs:444:pub struct ManagerStats {
+  savitri-core/src/metrics/mod.rs:456:pub fn create_metrics_manager_from_env() -> MetricsManager {
+  savitri-core/src/metrics/mod.rs:462:pub fn create_default_metrics_manager() -> MetricsManager {
+  savitri-core/src/metrics/provider.rs:21:pub struct MetricsConfig {
+  savitri-core/src/metrics/provider.rs:75:pub struct Metric {
+  savitri-core/src/metrics/provider.rs:92:pub enum MetricType {
+  savitri-core/src/metrics/provider.rs:146:pub struct MetricsProvider {
+  savitri-core/src/metrics/provider.rs:467:pub struct ProviderStats {
+  savitri-core/src/metrics/provider.rs:483:pub struct SavitriMetrics;
+  savitri-core/src/utils/bincode_utils.rs:46:pub fn consensus_bincode() -> impl Options {
+  savitri-core/src/utils/bincode_utils.rs:53:pub fn serialize_consensus<T: serde::Serialize>(data: &T) -> anyhow::Result<Vec<u8>> {
+  savitri-core/src/utils/bincode_utils.rs:60:pub fn deserialize_consensus<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> anyhow::Result<T> {
+  savitri-core/src/utils/convert.rs:7:pub fn bytes_to_hex(bytes: &[u8]) -> String {
+  savitri-core/src/utils/convert.rs:12:pub fn hex_to_bytes(hex_str: &str) -> Result<Vec<u8>> {
+  savitri-core/src/utils/convert.rs:18:pub fn bytes_to_hex_prefixed(bytes: &[u8]) -> String {
+  savitri-core/src/utils/convert.rs:23:pub fn hex_to_bytes_prefixed(hex_str: &str) -> Result<Vec<u8>> {
+  savitri-core/src/utils/convert.rs:28:pub fn str_to_u64(s: &str) -> Result<u64> {
+  savitri-core/src/utils/convert.rs:33:pub fn str_to_u128(s: &str) -> Result<u128> {
+  savitri-core/src/utils/convert.rs:38:pub fn u64_to_str(n: u64) -> String {
+  savitri-core/src/utils/convert.rs:43:pub fn u128_to_str(n: u128) -> String {
+  savitri-core/src/utils/convert.rs:48:pub fn bytes_to_u64_le(bytes: &[u8]) -> Result<u64> {
+  savitri-core/src/utils/convert.rs:56:pub fn bytes_to_u64_be(bytes: &[u8]) -> Result<u64> {
+  savitri-core/src/utils/convert.rs:64:pub fn u64_to_bytes_le(n: u64) -> Vec<u8> {
+  savitri-core/src/utils/convert.rs:69:pub fn u64_to_bytes_be(n: u64) -> Vec<u8> {
+  savitri-core/src/utils/convert.rs:74:pub fn bytes_to_u128_le(bytes: &[u8]) -> Result<u128> {
+  savitri-core/src/utils/convert.rs:82:pub fn bytes_to_u128_be(bytes: &[u8]) -> Result<u128> {
+  savitri-core/src/utils/convert.rs:90:pub fn u128_to_bytes_le(n: u128) -> Vec<u8> {
+  savitri-core/src/utils/convert.rs:95:pub fn u128_to_bytes_be(n: u128) -> Vec<u8> {
+  savitri-core/src/utils/convert.rs:100:pub fn slice_to_array<T, const N: usize>(slice: &[T]) -> Result<[T; N]>
+  savitri-core/src/utils/convert.rs:113:pub fn array_to_vec<T: Clone, const N: usize>(array: [T; N]) -> Vec<T> {
+  savitri-core/src/utils/convert.rs:118:pub fn safe_int_convert<T, U>(value: T) -> Result<U>
+  savitri-core/src/utils/convert.rs:127:pub fn float_to_fixed(value: f64, scale: u32) -> i64 {
+  savitri-core/src/utils/convert.rs:132:pub fn fixed_to_float(value: i64, scale: u32) -> f64 {
+  savitri-core/src/utils/convert.rs:137:pub fn percent_to_bps(percent: f64) -> u16 {
+  savitri-core/src/utils/convert.rs:142:pub fn bps_to_percent(bps: u16) -> f64 {
+  savitri-core/src/utils/convert.rs:147:pub fn wei_to_ether(wei: u128) -> f64 {
+  savitri-core/src/utils/convert.rs:152:pub fn ether_to_wei(ether: f64) -> u128 {
+  savitri-core/src/utils/convert.rs:161:pub fn now_timestamp() -> u64 {
+  savitri-core/src/utils/convert.rs:173:pub fn now_timestamp_ms() -> u64 {
+  savitri-core/src/utils/convert.rs:185:pub fn now_timestamp_us() -> u64 {
+  savitri-core/src/utils/convert.rs:197:pub fn now_timestamp_ns() -> u64 {
+  savitri-core/src/utils/convert.rs:205:pub fn timestamp_to_ms(timestamp: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:210:pub fn ms_to_timestamp(ms: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:215:pub fn ms_to_datetime(ms: u64) -> chrono::DateTime<chrono::Utc> {
+  savitri-core/src/utils/convert.rs:221:pub fn duration_between(start: u64, end: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:226:pub fn duration_between_ms(start_ms: u64, end_ms: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:231:pub fn is_within_last_seconds(timestamp: u64, seconds: u64) -> bool {
+  savitri-core/src/utils/convert.rs:237:pub fn is_within_last_ms(timestamp_ms: u64, ms: u64) -> bool {
+  savitri-core/src/utils/convert.rs:243:pub fn add_seconds(timestamp: u64, seconds: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:248:pub fn add_ms(timestamp_ms: u64, ms: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:253:pub fn subtract_seconds(timestamp: u64, seconds: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:258:pub fn subtract_ms(timestamp_ms: u64, ms: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:263:pub fn format_duration(duration: u64) -> String {
+  savitri-core/src/utils/convert.rs:278:pub fn format_duration_ms(duration_ms: u64) -> String {
+  savitri-core/src/utils/convert.rs:290:pub fn format_duration_secs(duration_secs: u64) -> String {
+  savitri-core/src/utils/convert.rs:295:pub fn now_iso8601() -> String {
+  savitri-core/src/utils/convert.rs:300:pub fn parse_iso8601(iso_str: &str) -> Result<u64> {
+  savitri-core/src/utils/convert.rs:307:pub fn slot(timestamp: u64, slot_duration: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:312:pub fn epoch(timestamp: u64, epoch_duration: u64) -> u64 {
+  savitri-core/src/utils/convert.rs:317:pub fn perf<F, R>(name: &str, f: F) -> R
+  savitri-core/src/utils/convert.rs:488:pub const MAX_DESERIALIZE_SIZE: usize = 4 * 1024 * 1024;
+  savitri-core/src/utils/convert.rs:539:pub fn serialized_size<T: serde::Serialize>(data: &T) -> Result<usize> {
+  savitri-core/src/utils/convert.rs:547:pub fn can_deserialize<T: serde::de::DeserializeOwned>(data: &[u8]) -> bool {
+  savitri-core/src/utils/convert.rs:555:pub fn serialize_to_hex<T: serde::Serialize>(data: &T) -> Result<String> {
+  savitri-core/src/utils/convert.rs:563:pub fn deserialize_from_hex<T: serde::de::DeserializeOwned>(hex_str: &str) -> Result<T> {
+  savitri-core/src/utils/test_utils.rs:27:pub fn unique_tmp_dir(prefix: &str) -> Result<PathBuf> {
+  savitri-core/src/utils/test_utils.rs:48:pub fn create_test_storage(prefix: &str) -> Result<(Storage, PathBuf)> {
+  savitri-core/src/utils/test_utils.rs:57:pub fn create_test_storage_default() -> Result<(Storage, PathBuf)> {
+  savitri-core/src/utils/test_utils.rs:65:pub fn cleanup_temp_dir(path: &Path) -> Result<()> {
+  savitri-core/src/utils/test_utils.rs:89:pub fn create_storage_with_accounts(
+  savitri-core/src/utils/time.rs:10:pub fn now_timestamp() -> u64 {
+  savitri-core/src/utils/tx_transfer_patch.rs:12:pub fn apply_transfer_patch(
+

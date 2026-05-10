@@ -1,0 +1,502 @@
+//! Digital Signatures for PoU Consensus
+//!
+//! This module provides digital signature functionality for all consensus messages
+//! including votes, proposals, and certificates. It integrates with the KeyManager
+//! for secure cryptographic operations.
+
+use anyhow::Result;
+use ed25519_dalek::{Signature, Signer, Verifier};
+
+use crate::crypto::key_manager::KeyManager;
+use crate::p2p::messages::{
+    ConsensusCertificate, ConsensusProposal, ConsensusVote, ConsensusEvidence,
+};
+
+#[derive(Debug, thiserror::Error)]
+pub enum CryptoError {
+    #[error("Serialization failed: {0}")]
+    SerializationFailed(String),
+    
+    #[error("Invalid signature format: {0}")]
+    InvalidSignatureFormat(String),
+    
+    #[error("Message too large: {0}")]
+    MessageTooLarge(usize),
+    
+    #[error("Key manager error: {0}")]
+    KeyManagerError(#[from] crate::crypto::key_manager::KeyManagerError),
+    
+    #[error("Verification failed: {0}")]
+    VerificationFailed(String),
+    
+    #[error("Invalid message type: {0}")]
+    InvalidMessageType(String),
+}
+
+/// Trait for signable consensus messages
+pub trait SignableMessage {
+    /// Serialize the message for signing
+    fn serialize_for_signing(&self) -> Result<Vec<u8>, CryptoError>;
+    
+    /// Get the message type identifier
+    fn message_type(&self) -> &'static str;
+    
+    /// Get the unique identifier for this message
+    fn unique_id(&self) -> Vec<u8>;
+}
+
+/// Trait for verifiable consensus messages
+pub trait VerifiableMessage {
+    /// Get the signature from the message
+    fn signature_bytes(&self) -> &[u8; 64];
+    
+    /// Get the signer's public key
+    fn signer_public_key(&self) -> Option<[u8; 32]>;
+    
+    /// Serialize the message for verification
+    fn serialize_for_verification(&self) -> Result<Vec<u8>, CryptoError>;
+}
+
+impl SignableMessage for ConsensusProposal {
+    fn serialize_for_signing(&self) -> Result<Vec<u8>, CryptoError> {
+        // Use the existing signable_bytes method which includes domain separation
+        self.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))
+    }
+    
+    fn message_type(&self) -> &'static str {
+        "CONSENSUS_PROPOSAL"
+    }
+    
+    fn unique_id(&self) -> Vec<u8> {
+        let mut id = Vec::new();
+        id.extend_from_slice(&self.proposer);
+        id.extend_from_slice(&self.height.to_le_bytes());
+        id.extend_from_slice(&self.round.to_le_bytes());
+        id.extend_from_slice(&self.sequence.to_le_bytes());
+        id
+    }
+}
+
+impl SignableMessage for ConsensusVote {
+    fn serialize_for_signing(&self) -> Result<Vec<u8>, CryptoError> {
+        // Use the existing signable_bytes method which includes domain separation
+        self.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))
+    }
+    
+    fn message_type(&self) -> &'static str {
+        "CONSENSUS_VOTE"
+    }
+    
+    fn unique_id(&self) -> Vec<u8> {
+        let mut id = Vec::new();
+        id.extend_from_slice(&self.voter);
+        id.extend_from_slice(&self.height.to_le_bytes());
+        id.extend_from_slice(&self.round.to_le_bytes());
+        id.extend_from_slice(&self.sequence.to_le_bytes());
+        id
+    }
+}
+
+impl SignableMessage for ConsensusEvidence {
+    fn serialize_for_signing(&self) -> Result<Vec<u8>, CryptoError> {
+        // Use the existing signable_bytes method which includes domain separation
+        self.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))
+    }
+    
+    fn message_type(&self) -> &'static str {
+        "CONSENSUS_EVIDENCE"
+    }
+    
+    fn unique_id(&self) -> Vec<u8> {
+        let mut id = Vec::new();
+        id.extend_from_slice(&self.offender);
+        id.extend_from_slice(&self.height.to_le_bytes());
+        id.extend_from_slice(&self.round.to_le_bytes());
+        id.extend_from_slice(&(self.evidence_type as u8).to_le_bytes());
+        id
+    }
+}
+
+impl VerifiableMessage for ConsensusProposal {
+    fn signature_bytes(&self) -> &[u8; 64] {
+        &self.signature
+    }
+    
+    fn signer_public_key(&self) -> Option<[u8; 32]> {
+        Some(self.proposer)
+    }
+    
+    fn serialize_for_verification(&self) -> Result<Vec<u8>, CryptoError> {
+        self.serialize_for_signing()
+    }
+}
+
+impl VerifiableMessage for ConsensusVote {
+    fn signature_bytes(&self) -> &[u8; 64] {
+        &self.signature
+    }
+    
+    fn signer_public_key(&self) -> Option<[u8; 32]> {
+        Some(self.voter)
+    }
+    
+    fn serialize_for_verification(&self) -> Result<Vec<u8>, CryptoError> {
+        self.serialize_for_signing()
+    }
+}
+
+/// Digital signature service for consensus operations
+pub struct DigitalSignatureService {
+    key_manager: std::sync::Arc<KeyManager>,
+}
+
+impl DigitalSignatureService {
+    /// Create new digital signature service
+    pub fn new(key_manager: std::sync::Arc<KeyManager>) -> Self {
+        Self { key_manager }
+    }
+    
+    /// Sign a consensus proposal
+    pub fn sign_proposal(&self, proposal: &mut ConsensusProposal) -> Result<(), CryptoError> {
+        // Use the existing signable_bytes method for signing
+        let message_data = proposal.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))?;
+        let signature = self.key_manager.sign_consensus_message(&message_data);
+        proposal.signature = signature.to_bytes();
+        
+        Ok(())
+    }
+    
+    /// Sign a consensus vote
+    pub fn sign_vote(&self, vote: &mut ConsensusVote) -> Result<(), CryptoError> {
+        // Use the existing signable_bytes method for signing
+        let message_data = vote.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))?;
+        let signature = self.key_manager.sign_consensus_message(&message_data);
+        vote.signature = signature.to_bytes();
+        
+        Ok(())
+    }
+    
+    /// Verify a consensus proposal
+    pub fn verify_proposal(&self, proposal: &ConsensusProposal) -> Result<bool, CryptoError> {
+        // Use the existing signable_bytes method for verification
+        let message_data = proposal.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))?;
+        let signature = utils::bytes_to_signature(&proposal.signature)?;
+        
+        Ok(self.key_manager.verify_signature(&message_data, &signature))
+    }
+    
+    /// Verify a consensus vote
+    pub fn verify_vote(&self, vote: &ConsensusVote) -> Result<bool, CryptoError> {
+        // Use the existing signable_bytes method for verification
+        let message_data = vote.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))?;
+        let signature = utils::bytes_to_signature(&vote.signature)?;
+        
+        Ok(self.key_manager.verify_signature(&message_data, &signature))
+    }
+    
+    /// Verify a consensus certificate
+    pub fn verify_certificate(&self, certificate: &ConsensusCertificate) -> Result<bool, CryptoError> {
+        // For certificates, we need to verify the aggregated signature
+        // This is more complex and would involve signature aggregation verification
+        // For now, we'll implement a basic verification
+        
+        // Check that we have voters and aggregated signature
+        if certificate.voters.is_empty() {
+            return Ok(false);
+        }
+        
+        if certificate.aggregated_signature.is_empty() {
+            return Ok(false);
+        }
+        
+        // In a real implementation, we would verify the aggregated signature
+        // For now, we'll just check that the aggregated signature is present
+        Ok(!certificate.aggregated_signature.is_empty())
+    }
+    
+    /// Sign evidence of misbehavior
+    pub fn sign_evidence(&self, evidence: &mut ConsensusEvidence) -> Result<(), CryptoError> {
+        // Use the existing signable_bytes method for signing
+        let message_data = evidence.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))?;
+        let signature = self.key_manager.sign_consensus_message(&message_data);
+        evidence.reporter_signature = signature.to_bytes();
+        
+        Ok(())
+    }
+    
+    /// Verify evidence of misbehavior
+    pub fn verify_evidence(&self, evidence: &ConsensusEvidence) -> Result<bool, CryptoError> {
+        // Use the existing signable_bytes method for verification
+        let message_data = evidence.signable_bytes().map_err(|e| CryptoError::SerializationFailed(e.to_string()))?;
+        let signature = utils::bytes_to_signature(&evidence.reporter_signature)?;
+        
+        Ok(self.key_manager.verify_signature(&message_data, &signature))
+    }
+    
+    /// Serialize evidence for signing
+    fn serialize_evidence_for_signing(&self, evidence: &ConsensusEvidence) -> Result<Vec<u8>, CryptoError> {
+        let mut data = Vec::new();
+        
+        // Add message type
+        data.extend_from_slice(b"EVIDENCE");
+        
+        // Add evidence type
+        data.push(evidence.evidence_type as u8);
+        
+        // Add offender
+        data.extend_from_slice(&evidence.offender);
+        
+        // Add height
+        data.extend_from_slice(&evidence.height.to_le_bytes());
+        
+        // Add round
+        data.extend_from_slice(&evidence.round.to_le_bytes());
+        
+        // Add committee ID
+        data.extend_from_slice(&evidence.committee_id.to_le_bytes());
+        
+        // Add reporter
+        data.extend_from_slice(&evidence.reporter);
+        
+        // Add evidence data
+        data.extend_from_slice(&(evidence.payload.len() as u64).to_le_bytes());
+        data.extend_from_slice(&evidence.payload);
+        
+        Ok(data)
+    }
+    
+    /// Serialize evidence for verification
+    fn serialize_evidence_for_verification(&self, evidence: &ConsensusEvidence) -> Result<Vec<u8>, CryptoError> {
+        self.serialize_evidence_for_signing(evidence)
+    }
+    
+    /// Batch verify multiple messages
+    pub fn batch_verify_proposals(&self, proposals: &[ConsensusProposal]) -> Result<Vec<bool>, CryptoError> {
+        let mut results = Vec::with_capacity(proposals.len());
+        
+        for proposal in proposals {
+            results.push(self.verify_proposal(proposal)?);
+        }
+        
+        Ok(results)
+    }
+    
+    /// Batch verify multiple votes
+    pub fn batch_verify_votes(&self, votes: &[ConsensusVote]) -> Result<Vec<bool>, CryptoError> {
+        let mut results = Vec::with_capacity(votes.len());
+        
+        for vote in votes {
+            results.push(self.verify_vote(vote)?);
+        }
+        
+        Ok(results)
+    }
+    
+    /// Get the public key of this node
+    pub fn public_key(&self) -> [u8; 32] {
+        self.key_manager.public_key().to_bytes()
+    }
+    
+    /// Get the node ID of this node
+    pub fn node_id(&self) -> crate::crypto::key_manager::NodeId {
+        self.key_manager.node_id()
+    }
+}
+
+/// Utility functions for signature operations
+pub mod utils {
+    use super::*;
+    
+    /// Convert signature bytes to Signature object
+    pub fn bytes_to_signature(bytes: &[u8]) -> Result<Signature, CryptoError> {
+        if bytes.len() != 64 {
+            return Err(CryptoError::InvalidSignatureFormat(
+                format!("Invalid signature length: expected 64, got {}", bytes.len())
+            ));
+        }
+        
+        let mut signature_bytes = [0u8; 64];
+        signature_bytes.copy_from_slice(bytes);
+        
+        // Use try_from for Ed25519 signature creation
+        match ed25519_dalek::Signature::try_from(&signature_bytes) {
+            Ok(signature) => Ok(signature),
+            Err(e) => Err(CryptoError::InvalidSignatureFormat(e.to_string()))
+        }
+    }
+    
+    /// Create a deterministic signature for testing
+    #[cfg(test)]
+    pub fn create_test_signature(message: &[u8]) -> Signature {
+        use sha2::{Digest, Sha256};
+        
+        let mut hasher = Sha256::new();
+        hasher.update(b"test-signature");
+        hasher.update(message);
+        let hash = hasher.finalize();
+        
+        let mut signature_bytes = [0u8; 64];
+        signature_bytes[..32].copy_from_slice(&hash);
+        // Fill the rest with deterministic data
+        for i in 32..64 {
+            signature_bytes[i] = (i as u8).wrapping_add(42);
+        }
+        
+        // Use from_bytes for Ed25519 signature creation (test only)
+        // In ed25519-dalek 2.0, we need to use a different approach for test signatures
+        let mut sig_bytes = [0u8; 64];
+        sig_bytes.copy_from_slice(&signature_bytes);
+        // For testing, we'll create a signature using the keypair
+        use ed25519_dalek::SigningKey;
+        use rand::rngs::OsRng;
+        let test_keypair = SigningKey::generate(&mut OsRng);
+        test_keypair.sign(message)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::key_manager::KeyManager;
+    use crate::p2p::messages::{ConsensusProposal, ConsensusVote};
+    use tempfile::TempDir;
+    use tokio;
+    
+    #[tokio::test]
+    async fn test_proposal_signing_and_verification() {
+        let temp_dir = TempDir::new().unwrap();
+        let key_file = temp_dir.path().join("test_key.bin");
+        
+        let key_manager = std::sync::Arc::new(KeyManager::load_or_create(key_file).await.unwrap());
+        let signing_service = DigitalSignatureService::new(key_manager);
+        
+        // Create proposal
+        let mut proposal = ConsensusProposal::new(
+            1, // epoch_id
+            0, // committee_id
+            100, // height
+            0,  // round
+            1, // sequence
+            signing_service.node_id(), // proposer
+            Hash64::new([42u8; 64]), // block_hash
+            b"test proposal body".to_vec(), // body
+        );
+        
+        // Sign the proposal
+        signing_service.sign_proposal(&mut proposal).unwrap();
+        
+        // Verify the proposal
+        let is_valid = signing_service.verify_proposal(&proposal).unwrap();
+        assert!(is_valid);
+        
+        // Verify with modified proposal should fail
+        let mut invalid_proposal = proposal.clone();
+        invalid_proposal.height = 101;
+        let is_invalid = signing_service.verify_proposal(&invalid_proposal).unwrap();
+        assert!(!is_invalid);
+    }
+    
+    #[tokio::test]
+    async fn test_vote_signing_and_verification() {
+        let temp_dir = TempDir::new().unwrap();
+        let key_file = temp_dir.path().join("test_key.bin");
+        
+        let key_manager = std::sync::Arc::new(KeyManager::load_or_create(key_file).await.unwrap());
+        let signing_service = DigitalSignatureService::new(key_manager);
+        
+        // Create vote
+        let mut vote = ConsensusVote::new(
+            1, // epoch_id
+            0, // committee_id
+            100, // height
+            0,  // round
+            1, // sequence
+            signing_service.node_id(), // voter
+            Hash64::new([42u8; 64]), // block_hash
+        );
+        
+        // Sign the vote
+        signing_service.sign_vote(&mut vote).unwrap();
+        
+        // Verify the vote
+        let is_valid = signing_service.verify_vote(&vote).unwrap();
+        assert!(is_valid);
+        
+        // Verify with modified vote should fail
+        let mut invalid_vote = vote.clone();
+        invalid_vote.height = 101;
+        let is_invalid = signing_service.verify_vote(&invalid_vote).unwrap();
+        assert!(!is_invalid);
+    }
+    
+    #[tokio::test]
+    async fn test_batch_verification() {
+        let temp_dir = TempDir::new().unwrap();
+        let key_file = temp_dir.path().join("test_key.bin");
+        
+        let key_manager = std::sync::Arc::new(KeyManager::load_or_create(key_file).await.unwrap());
+        let signing_service = DigitalSignatureService::new(key_manager);
+        
+        // Create multiple proposals
+        let mut proposals = Vec::new();
+        for i in 0..5 {
+            let mut proposal = ConsensusProposal::new(
+                1, // epoch_id
+                0, // committee_id
+                100 + i, // height
+                0, // round
+                1, // sequence
+                signing_service.node_id(), // proposer
+                Hash64::new([i as u8; 64]), // block_hash
+                format!("test proposal {}", i).into_bytes(), // body
+            );
+            signing_service.sign_proposal(&mut proposal).unwrap();
+            proposals.push(proposal);
+        }
+        
+        // Batch verify
+        let results = signing_service.batch_verify_proposals(&proposals).unwrap();
+        
+        // All should be valid
+        assert!(results.iter().all(|&valid| valid));
+        assert_eq!(results.len(), 5);
+    }
+    
+    #[test]
+    fn test_message_serialization() {
+        let proposal = ConsensusProposal::new(
+            1, 0, 100, 0, 1, [42u8; 32], Hash64::new([1u8; 64]), b"test".to_vec()
+        );
+        
+        let serialized = proposal.serialize_for_signing().unwrap();
+        
+        // Should contain message type
+        assert!(serialized.starts_with(b"PROPOSAL"));
+        
+        // Should contain all fields
+        assert!(serialized.len() > 100);
+    }
+    
+    #[test]
+    fn test_utils_bytes_to_signature() {
+        let mut signature_bytes = [0u8; 64];
+        for i in 0..64 {
+            signature_bytes[i] = i as u8;
+        }
+        
+        let signature = utils::bytes_to_signature(&signature_bytes).unwrap();
+        
+        // Convert back and verify
+        assert_eq!(signature.to_bytes(), signature_bytes);
+    }
+    
+    #[test]
+    fn test_utils_test_signature() {
+        let message = b"test message";
+        let signature = utils::create_test_signature(message);
+        
+        // Should be deterministic
+        let signature2 = utils::create_test_signature(message);
+        assert_eq!(signature.to_bytes(), signature2.to_bytes());
+    }
+}

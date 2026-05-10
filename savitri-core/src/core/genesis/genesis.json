@@ -1,0 +1,1 @@
+{"version": 1, "timestamp": 1609459200, "proposer": "genesis_proposer", "signature": "genesis_signature", "state_root": "genesis_state_root", "parent_exec_hash": "genesis_parent_exec_hash", "parent_ref_hash": "genesis_parent_ref_hash", "transactions": []}

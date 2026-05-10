@@ -1,0 +1,105 @@
+[package]
+name = "savitri-masternode"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Savitri Network"]
+description = "Masternode implementation for Savitri Network - full validator node"
+homepage = "https://savitrinetwork.com"
+repository = "https://github.com/savitri-network/savitri-masternode"
+keywords = ["blockchain", "node", "validator", "masternode", "savitri"]
+categories = ["blockchain"]
+default-run = "savitri-masternode"
+
+[dependencies]
+# Core dependencies - LOCAL PATH FOR TESTING
+savitri-core = { path = "../savitri-core", features = ["testnet"] }
+savitri-rpc = { path = "../savitri-rpc", optional = true }
+savitri-p2p = { path = "../savitri-p2p", features = ["kademlia"] }
+savitri-zkp = { path = "../savitri-zkp", features = ["arkworks"] }
+savitri-storage = { path = "../savitri-storage", features = ["rocksdb"], optional = true }
+savitri-consensus = { path = "../savitri-consensus", features = ["group-aware", "bft"], optional = true }
+savitri-contracts = { path = "../Savitri-contracts", optional = true }
+serde-big-array = "0.5"
+rand = "=0.8.5"
+rand_chacha = "0.3"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+toml = "0.8"
+bincode = "=1.3.3"
+
+# Cryptography
+sha2 = "=0.10.8"
+sha3 = "0.10"
+blake3 = { version = "=1.5.5", features = ["pure"] }  # pure = no assembly, funziona con MSVC su Windows
+hex = "0.4"
+ed25519-dalek = { version = "=2.1", features = ["batch", "rand_core"] }
+anyhow = "1.0"  # Error handling
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Metrics
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.18", default-features = false, features = ["http-listener"] }
+prometheus = "0.13"
+
+# System monitoring
+sysinfo = "0.30"
+
+# P2P networking (full libp2p stack for gossipsub - MUST match lightnode)
+libp2p = { version = "0.55", default-features = false, features = [
+    "ed25519",
+    "gossipsub",
+    "tcp",
+    "dns",
+    "noise",
+    "yamux",
+    "tokio",
+    "macros",
+    "kad",        # Kademlia DHT support
+    "request-response",
+    "relay",      # Relay server (NAT traversal for lightnodes)
+    "dcutr",      # Direct connection upgrade via hole-punching
+    "autonat",    # NAT detection server
+    "identify",   # Needed for relay address advertisement
+    "quic",       # QUIC/UDP transport (NAT-friendly, built-in TLS 1.3)
+] }
+
+# Storage
+rocksdb = { version = "=0.22.0", features = ["zstd"] }
+lru = "0.12"
+tempfile = "3.8"
+
+# Utilities
+thiserror = "1.0"
+humantime = "2"
+once_cell = "1.19"
+
+[features]
+default = ["full"]
+full = ["storage", "consensus", "p2p", "contracts"]
+rpc = ["dep:savitri-rpc"]
+storage = ["dep:savitri-storage"]
+consensus = ["dep:savitri-consensus"]
+p2p = []
+# ZKP backend specific features (ZKP is always included)
+zkp-plonk = ["savitri-zkp/plonk"]
+zkp-arkworks = ["savitri-zkp/arkworks"]
+zkp-all = ["savitri-zkp/all_backends"]
+contracts = ["dep:savitri-contracts"]
+minimal = ["core", "p2p"]
+core = []
+
+[[bin]]
+name = "savitri-masternode"
+path = "src/main.rs"

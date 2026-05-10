@@ -1,0 +1,39 @@
+[2m2026-01-28T08:12:52.691032Z[0m [32m INFO[0m [2msavitri_masternode::telemetry[0m[2m:[0m metrics endpoint ready [3mlisten[0m[2m=[0m0.0.0.0:9898
+[2m2026-01-28T08:12:53.541746Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Loading identity from path: identity-5.key
+[2m2026-01-28T08:12:53.541782Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Creating parent directory: ""
+[2m2026-01-28T08:12:53.541869Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Key file exists, reading from: identity-5.key
+[2m2026-01-28T08:12:53.581081Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Masternode starting [3mnode_id[0m[2m=[0m12D3KooWF42pV6FWKsBeiM9ak2b4CQx7vkJmJAtRtUYxrhWDVUKU [3mp2p_port[0m[2m=[0m5025 [3mstorage_path[0m[2m=[0mstorage-5 [3mvalidators[0m[2m=[0m5 [3mvalidator_stake[0m[2m=[0m1000000
+[2m2026-01-28T08:12:53.581134Z[0m [32m INFO[0m [2msavitri_masternode::bridge::core::slot_scheduler[0m[2m:[0m Slot scheduler initialized [3mslot_duration_ms[0m[2m=[0m1000 [3mepoch_slots[0m[2m=[0m86400 [3mvalidators[0m[2m=[0m5 [3mlocal_id[0m[2m=[0m12D3KooWF42pV6FWKsBeiM9ak2b4CQx7vkJmJAtRtUYxrhWDVUKU
+[2m2026-01-28T08:12:54.747451Z[0m [32m INFO[0m [2msavitri_masternode::monolith_storage[0m[2m:[0m Monolith storage initialized [3mdb_path[0m[2m=[0m./monoliths-5 [3mmax_monoliths[0m[2m=[0m10000 [3mcache_size[0m[2m=[0m1000
+[2m2026-01-28T08:12:54.747519Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Monolith producer with storage initialized
+[2m2026-01-28T08:12:54.747540Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Monolith P2P manager initialized
+[2m2026-01-28T08:12:54.747550Z[0m [32m INFO[0m [2msavitri_masternode::group_formation[0m[2m:[0m Starting group formation manager
+[2m2026-01-28T08:12:54.747566Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Group formation manager initialized
+[2m2026-01-28T08:12:54.747572Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Group-aware consensus engine initialized (placeholder)
+[2m2026-01-28T08:12:54.747578Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Proposal validator initialized
+[2m2026-01-28T08:12:54.747587Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m P2P block receiver channels initialized
+[2m2026-01-28T08:12:54.747592Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Initializing libp2p network on port 5025 with Noise/Yamux/Gossipsub
+[2m2026-01-28T08:12:54.754641Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWF42pV6FWKsBeiM9ak2b4CQx7vkJmJAtRtUYxrhWDVUKU
+[2m2026-01-28T08:12:54.758024Z[0m [32m INFO[0m [2msavitri_masternode::libp2p_network[0m[2m:[0m Libp2p network initialized with gossipsub [3mpeer_id[0m[2m=[0m12D3KooWF42pV6FWKsBeiM9ak2b4CQx7vkJmJAtRtUYxrhWDVUKU [3mport[0m[2m=[0m5025
+[2m2026-01-28T08:12:54.758057Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Libp2p network started - peer_id: 12D3KooWF42pV6FWKsBeiM9ak2b4CQx7vkJmJAtRtUYxrhWDVUKU on port 5025
+[2m2026-01-28T08:12:54.758068Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Bootstrap peer configured: 12D3KooWMhnoLgDdGJ1kiNvRruJ7BJUKeCowXqE8NUSUahHUtDNv@/ip4/127.0.0.1/tcp/5021
+[2m2026-01-28T08:12:54.758074Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Bootstrap peer configured: 12D3KooWSVEN7mLHu5N3rBSRFdLSEf7p37ybtE7fpah1e1em2wSa@/ip4/127.0.0.1/tcp/5022
+[2m2026-01-28T08:12:54.758080Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Bootstrap peer configured: 12D3KooWExample3@/ip4/127.0.0.1/tcp/5023
+[2m2026-01-28T08:12:54.758086Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Bootstrap peer configured: 12D3KooWExample4@/ip4/127.0.0.1/tcp/5024
+[2m2026-01-28T08:12:54.758092Z[0m [32m INFO[0m [2msavitri_masternode::consensus_integration[0m[2m:[0m Integrated consensus system started (stub)
+[2m2026-01-28T08:12:54.758098Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Integrated consensus system initialized
+[2m2026-01-28T08:12:54.877557Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Masternode running - waiting for block proposals from light nodes
+[2m2026-01-28T08:12:54.877597Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Masternode ready - waiting for block proposals from light nodes
+[2m2026-01-28T08:12:54.877643Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Starting libp2p network event loop...
+[2m2026-01-28T08:12:54.881171Z[0m [32m INFO[0m [2msavitri_masternode::libp2p_network[0m[2m:[0m Listening on /ip4/172.30.96.1/tcp/5025
+[2m2026-01-28T08:12:54.881211Z[0m [32m INFO[0m [2msavitri_masternode::libp2p_network[0m[2m:[0m Listening on /ip4/192.168.8.25/tcp/5025
+[2m2026-01-28T08:12:54.881221Z[0m [32m INFO[0m [2msavitri_masternode::libp2p_network[0m[2m:[0m Listening on /ip4/127.0.0.1/tcp/5025
+[2m2026-01-28T08:12:54.881230Z[0m [32m INFO[0m [2msavitri_masternode::libp2p_network[0m[2m:[0m Listening on /ip4/192.168.240.1/tcp/5025
+[2m2026-01-28T08:13:24.877710Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Masternode active - waiting for block proposals
+[2m2026-01-28T08:13:43.119253Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Shutdown signal received, stopping masternode
+[2m2026-01-28T08:13:43.119308Z[0m [32m INFO[0m [2msavitri_masternode::consensus_integration[0m[2m:[0m Integrated consensus system stopped (stub)
+[2m2026-01-28T08:13:43.119324Z[0m [32m INFO[0m [2msavitri_masternode::group_formation[0m[2m:[0m Stopping group formation manager
+[2m2026-01-28T08:13:43.119340Z[0m [32m INFO[0m [2msavitri_masternode[0m[2m:[0m Masternode shutdown complete
+[2m2026-01-28T08:13:43.119359Z[0m [32m INFO[0m [2msavitri_masternode::group_formation[0m[2m:[0m Cleanup task shutting down gracefully
+[2m2026-01-28T08:13:43.119352Z[0m [32m INFO[0m [2msavitri_masternode::group_formation[0m[2m:[0m Group formation task shutting down gracefully
+[2m2026-01-28T08:13:43.119404Z[0m [32m INFO[0m [2msavitri_masternode::telemetry[0m[2m:[0m System metrics task shutting down gracefully

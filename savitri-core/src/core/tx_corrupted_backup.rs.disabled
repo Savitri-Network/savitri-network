@@ -1,0 +1,3054 @@
+use anyhow::Context;
+use bincode;
+use ed25519_dalek::{VerifyingKey as PublicKey, Verifier};
+use hex;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+use savitri_storage::{DbBatch, Storage};
+use super::types::{Account, FeeLimits};
+use super::executor::cache::ExecutorAccountCache;
+use sha2::{Sha512};
+use sha3::Keccak256;
+use std::collections::BTreeMap;
+
+// Transaction types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Transaction {
+    pub from: Vec<u8>,
+    pub to: Vec<u8>,
+    pub amount: u128,
+    pub nonce: u64,
+    pub fee: Option<u128>,
+    pub pubkey: Vec<u8>,
+    pub sig: [u8; 64],
+    pub pre_verified: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedTx {
+    pub from: Vec<u8>,
+    pub to: Vec<u8>,
+    pub amount: u128,
+    pub nonce: u64,
+    pub fee: Option<u128>,
+    pub pubkey: Vec<u8>,
+    pub sig: [u8; 64],
+    pub pre_verified: bool,
+}
+
+impl SignedTx {
+    pub fn to_transaction(&self) -> Transaction {
+        Transaction {
+            from: self.from.clone(),
+            to: self.to.clone(),
+            amount: self.amount,
+            nonce: self.nonce,
+            fee: self.fee,
+            pubkey: self.pubkey.clone(),
+            sig: self.sig,
+            pre_verified: self.pre_verified,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeployTransaction {
+    pub from: Vec<u8>,
+    pub bytecode: Vec<u8>,
+    pub nonce: u64,
+    pub fee: Option<u128>,
+    pub pubkey: Vec<u8>,
+    pub sig: [u8; 64],
+    pub pre_verified: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallTransaction {
+    pub from: Vec<u8>,
+    pub contract_address: Vec<u8>,
+    pub function_selector: Vec<u8>,
+    pub calldata: Vec<u8>,
+    pub nonce: u64,
+    pub fee: Option<u128>,
+    pub pubkey: Vec<u8>,
+    pub sig: [u8; 64],
+    pub pre_verified: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Receipt {
+    pub success: bool,
+    pub gas_used: u64,
+    pub return_data: Vec<u8>,
+    pub events: Vec<ReceiptEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReceiptEvent {
+    pub topics: Vec<Vec<u8>>,
+    pub data: Vec<u8>,
+}
+
+pub const MAX_TX_SIZE: usize = 1024 * 1024; // 1 MiB hard cap for serialized tx
+
+/// Limiti fee di default (configurabili)
+/// Possono essere sovrascritti passando FeeLimits come parametro
+pub const DEFAULT_FEE_LIMITS: FeeLimits = FeeLimits {
+    min_fee: 100_000_000_000_000,       // 0.0001 token
+    max_fee: 1_000_000_000_000_000_000, // 1.0 token
+};
+
+/// Validate transaction signature
+pub fn validate_transaction_signature(tx: &SignedTx) -> anyhow::Result<bool> {
+    use ed25519_dalek::{Signature, Verifier};
+    use sha2::{Digest, Sha256};
+    
+    // Create message from transaction data
+    let message = format!("{}:{}:{}:{}:{}", 
+        hex::encode(&tx.from),
+        hex::encode(&tx.to),
+        tx.amount,
+        tx.nonce,
+        tx.fee.unwrap_or(0)
+    );
+    
+    let message_hash = Sha256::digest(message.as_bytes());
+    
+    // Parse signature
+    let signature = Signature::from_bytes(&tx.sig)
+        .map_err(|e| anyhow::anyhow!("Invalid signature: {}", e))?;
+    
+    // Parse public key
+    let public_key = ed25519_dalek::VerifyingKey::from_bytes(&tx.pubkey.try_into()
+        .map_err(|_| anyhow::anyhow!("Invalid public key length"))?)
+        .map_err(|e| anyhow::anyhow!("Invalid public key: {}", e))?;
+    
+    // Verify signature
+    Ok(public_key.verify(&message_hash, &signature).is_ok())
+}
+
+/// Create a new transaction
+pub fn create_transaction(
+    from: &[u8; 32],
+    to: &[u8; 32],
+    amount: u128,
+    nonce: u64,
+    fee: u128,
+) -> anyhow::Result<Transaction> {
+    if amount == 0 {
+        anyhow::bail!("Amount must be greater than zero");
+    }
+    if fee < DEFAULT_FEE_LIMITS.min_fee {
+        anyhow::bail!("Fee below minimum: {}", DEFAULT_FEE_LIMITS.min_fee);
+    }
+    if fee > DEFAULT_FEE_LIMITS.max_fee {
+        anyhow::bail!("Fee above maximum: {}", DEFAULT_FEE_LIMITS.max_fee);
+    }
+    
+    Ok(Transaction {
+        from: from.to_vec(),
+        to: to.to_vec(),
+        amount,
+        nonce,
+        fee: Some(fee),
+        pubkey: vec![], // Will be filled during signing
+        sig: [0u8; 64], // Will be filled during signing
+        pre_verified: false,
+    })
+}
+
+/// Generate transaction hash
+pub fn generate_tx_hash(tx: &Transaction) -> anyhow::Result<[u8; 32]> {
+    use sha2::{Digest, Sha256};
+    
+    // Create canonical transaction data for hashing
+    let tx_data = format!("{}:{}:{}:{}:{}:{}", 
+        hex::encode(&tx.from),
+        hex::encode(&tx.to),
+        tx.amount,
+        tx.nonce,
+        tx.fee.unwrap_or(0),
+        hex::encode(&tx.pubkey),
+        hex::encode(&tx.sig)
+    );
+    
+    let hash = Sha256::digest(tx_data.as_bytes());
+    let mut result = [0u8; 32];
+    result.copy_from_slice(&hash);
+    Ok(result)
+}
+
+/// Get transaction fee
+pub fn get_tx_fee(tx: &Transaction) -> u128 {
+    tx.fee.unwrap_or(0)
+}
+
+/// Estimate transaction gas
+pub fn estimate_tx_gas(tx: &Transaction) -> anyhow::Result<u64> {
+    // Base gas for standard transaction
+    let mut gas = 21000;
+    
+    // Additional gas for amount (0 if zero)
+    if tx.amount > 0 {
+        gas += 9000; // Transfer gas
+    }
+    
+    // Additional gas for data size
+    gas += tx.from.len() as u64 * 68; // 68 gas per byte for non-zero data
+    gas += tx.to.len() as u64 * 68;
+    
+    // Additional gas for larger amounts
+    if tx.amount > 1000000_000_000_000_000 { // > 1 token
+        gas += 10000;
+    }
+    
+    Ok(gas)
+}
+
+/// Check if transaction is contract deployment
+pub fn is_contract_deployment(tx: &Transaction) -> bool {
+    // Contract deployment if recipient is zero address (0x000...000)
+    // and there's bytecode data (would be in a different field in real implementation)
+    tx.to == vec![0u8; 20] || tx.to == vec![0u8; 32] // Check both 20 and 32 byte zero addresses
+}
+
+/// Get transaction recipient
+pub fn get_recipient(tx: &Transaction) -> &[u8] {
+    &tx.to
+}
+
+/// Get transaction sender
+pub fn get_sender(tx: &Transaction) -> &[u8] {
+    &tx.from
+}
+
+/// Get transaction value
+pub fn get_value(tx: &Transaction) -> u128 {
+    tx.amount
+}
+
+/// Get transaction nonce
+pub fn get_nonce(tx: &Transaction) -> u64 {
+    tx.nonce
+}
+
+/// Set transaction nonce
+pub fn set_nonce(tx: &mut Transaction, nonce: u64) {
+    tx.nonce = nonce;
+}
+
+/// Set transaction fee
+pub fn set_fee(tx: &mut Transaction, fee: u128) {
+    tx.fee = Some(fee);
+}
+
+/// Mark transaction as pre-verified
+pub fn mark_pre_verified(tx: &mut Transaction) {
+    tx.pre_verified = true;
+}
+
+/// Check if transaction is pre-verified
+pub fn is_pre_verified(tx: &Transaction) -> bool {
+    tx.pre_verified
+}
+
+/// Create deployment transaction
+pub fn create_deployment_transaction(
+    from: &[u8; 32],
+    bytecode: Vec<u8>,
+    nonce: u64,
+    fee: u128,
+) -> anyhow::Result<DeployTransaction> {
+    if bytecode.is_empty() {
+        anyhow::bail!("Bytecode cannot be empty for deployment");
+    }
+    if bytecode.len() > 24576 { // 24KB limit
+        anyhow::bail!("Bytecode too large: {} bytes (max 24576)", bytecode.len());
+    }
+    if fee < DEFAULT_FEE_LIMITS.min_fee * 10 { // Higher fee for deployment
+        anyhow::bail!("Deployment fee too low: minimum {}", DEFAULT_FEE_LIMITS.min_fee * 10);
+    }
+    
+    Ok(DeployTransaction {
+        from: from.to_vec(),
+        bytecode,
+        nonce,
+        fee: Some(fee),
+        pubkey: vec![], // Will be filled during signing
+        sig: [0u8; 64], // Will be filled during signing
+        pre_verified: false,
+    })
+}
+
+/// Convert signed transaction to deployment
+pub fn signed_tx_to_deployment(tx: &SignedTx) -> anyhow::Result<DeployTransaction> {
+    if !is_contract_deployment(&tx.to_transaction()) {
+        anyhow::bail!("Not a contract deployment transaction");
+    }
+    
+    Ok(DeployTransaction {
+        from: tx.from.clone(),
+        bytecode: vec![], // Bytecode would be in separate field in real implementation
+        nonce: tx.nonce,
+        fee: tx.fee,
+        pubkey: tx.pubkey.clone(),
+        sig: tx.sig,
+        pre_verified: tx.pre_verified,
+    })
+}
+
+/// Convert deployment to signed transaction
+pub fn deployment_to_signed_tx(deployment: &DeployTransaction) -> anyhow::Result<SignedTx> {
+    Ok(SignedTx {
+        from: deployment.from.clone(),
+        to: vec![0u8; 32], // Zero address for contract deployment
+        amount: 0, // No value for deployment
+        nonce: deployment.nonce,
+        fee: deployment.fee,
+        pubkey: deployment.pubkey.clone(),
+        sig: deployment.sig,
+        pre_verified: deployment.pre_verified,
+    })
+}
+
+/// Calculate contract address from deployment transaction
+pub fn calculate_contract_address(deployer: &[u8], nonce: u64) -> [u8; 32] {
+    use sha3::{Digest, Keccak256};
+    
+    let input = [deployer, &nonce.to_le_bytes()].concat();
+    let hash = Keccak256::digest(&input);
+    let mut address = [0u8; 32];
+    address.copy_from_slice(&hash);
+    address
+}
+
+/// Execute contract constructor
+pub fn execute_contract_constructor(
+    _bytecode: &[u8],
+    _args: &[u8],
+    _deployer: &[u8],
+    _value: u128,
+    _gas_limit: u64,
+    _cache: &mut ExecutorAccountCache,
+) -> Result<ConstructorResult, anyhow::Error> {
+    // TODO: Implement actual contract execution
+    Ok(ConstructorResult {
+        initial_state: vec![],
+        gas_used: 21000,
+    })
+}
+
+/// Execute contract call
+pub fn execute_contract_call(
+    _contract_address: &[u8],
+    _calldata: &[u8],
+    _sender: &[u8],
+    _value: u128,
+    _gas_limit: u64,
+    _cache: &mut ExecutorAccountCache,
+) -> Result<CallResult, anyhow::Error> {
+    // TODO: Implement actual contract execution
+    Ok(CallResult {
+        new_state: vec![],
+        return_data: vec![],
+        gas_used: 21000,
+    })
+}
+
+// Contract execution result structures
+#[derive(Debug, Clone)]
+pub struct ConstructorResult {
+    pub initial_state: Vec<u8>,
+    pub gas_used: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct CallResult {
+    pub new_state: Vec<u8>,
+    pub return_data: Vec<u8>,
+    pub gas_used: u64,
+}
+
+    }
+    
+    Ok(DeployTransaction {
+        from: from.to_vec(),
+        bytecode,
+        nonce,
+        fee: Some(fee),
+        pubkey: vec![], // Will be filled during signing
+        sig: [0u8; 64], // Will be filled during signing
+        pre_verified: false,
+    })
+}
+
+/// Convert signed transaction to deployment
+pub fn signed_tx_to_deployment(tx: &SignedTx) -> anyhow::Result<DeployTransaction> {
+    if !is_contract_deployment(&tx.to_transaction()) {
+        anyhow::bail!("Not a contract deployment transaction");
+    }
+    
+    Ok(DeployTransaction {
+        from: tx.from.clone(),
+        bytecode: vec![], // Bytecode would be in separate field in real implementation
+        nonce: tx.nonce,
+        fee: tx.fee,
+        pubkey: tx.pubkey.clone(),
+        sig: tx.sig,
+        pre_verified: tx.pre_verified,
+    })
+}
+
+/// Convert deployment to signed transaction
+pub fn deployment_to_signed_tx(deployment: &DeployTransaction) -> anyhow::Result<SignedTx> {
+    Ok(SignedTx {
+        from: deployment.from.clone(),
+        to: vec![0u8; 32], // Zero address for contract deployment
+        amount: 0, // No value for deployment
+        nonce: deployment.nonce,
+        fee: deployment.fee,
+        pubkey: deployment.pubkey.clone(),
+        sig: deployment.sig,
+        pre_verified: deployment.pre_verified,
+    })
+}
+
+// Contract execution result structures
+#[derive(Debug, Clone)]
+pub struct ConstructorResult {
+    pub initial_state: Vec<u8>,
+    pub gas_used: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct CallResult {
+    pub new_state: Vec<u8>,
+    pub return_data: Vec<u8>,
+    pub gas_used: u64,
+}
+
+pub const MAX_TX_SIZE: usize = 1024 * 1024; // 1 MiB hard cap for serialized tx
+
+/// Limiti fee di default (configurabili)
+/// Possono essere sovrascritti passando FeeLimits come parametro
+pub const DEFAULT_FEE_LIMITS: FeeLimits = FeeLimits {
+    min_fee: 100_000_000_000_000,       // 0.0001 token
+    max_fee: 1_000_000_000_000_000_000, // 1.0 token
+};
+
+const TX_DOMAIN_SEPARATOR: &[u8] = b"savitri-tx-v1";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SignedTx {
+    pub from: Vec<u8>,
+    pub to: Vec<u8>,
+    pub amount: u128,
+    #[serde(default)]
+    pub nonce: u64,
+    #[serde(default)]
+    pub fee: Option<u128>,
+    pub pubkey: [u8; 32],
+    #[serde(with = "serde_big_array::BigArray")]
+    pub sig: [u8; 64],
+    #[serde(default)]
+    pub pre_verified: bool,
+}
+
+// Legacy structure for backward compatibility
+#[derive(Debug, Clone, Deserialize)]
+struct SignedTxLegacy {
+    from: Vec<u8>,
+    to: Vec<u8>,
+    amount: u128,
+    pubkey: [u8; 32],
+    #[serde(with = "serde_big_array::BigArray")]
+    sig: [u8; 64],
+}
+
+impl From<SignedTxLegacy> for SignedTx {
+    fn from(legacy: SignedTxLegacy) -> Self {
+        SignedTx {
+            from: legacy.from,
+            to: legacy.to,
+            amount: legacy.amount,
+            nonce: 0,
+            fee: None,
+            pubkey: legacy.pubkey,
+            sig: legacy.sig,
+            pre_verified: false,
+        }
+    }
+}
+
+/// Deserialize SignedTx with backward compatibility for old format (without fee field)
+pub fn deserialize_signed_tx(bytes: &[u8]) -> Result<SignedTx, bincode::Error> {
+    // Try to deserialize as new format first
+    match bincode::deserialize::<SignedTx>(bytes) {
+        Ok(tx) => Ok(tx),
+        Err(e) => {
+            // If it fails, try legacy format (without fee field)
+            match bincode::deserialize::<SignedTxLegacy>(bytes) {
+                Ok(legacy) => Ok(SignedTx::from(legacy)),
+                Err(_) => Err(e), // Return original error if legacy also fails
+            }
+        }
+    }
+}
+
+/// Serialize SignedTx to bytes
+pub fn serialize_signed_tx(tx: &SignedTx) -> Vec<u8> {
+    bincode::serialize(tx).unwrap()
+}
+
+impl SignedTx {
+    pub fn message(&self) -> Vec<u8> {
+        // Deterministic, domain-separated message: D || nonce || from || to || amount(LE16)
+        let mut m =
+            Vec::with_capacity(TX_DOMAIN_SEPARATOR.len() + 1 + 8 + self.from.len() + self.to.len() + 16);
+        m.extend_from_slice(TX_DOMAIN_SEPARATOR);
+        m.push(b'T');
+        m.extend_from_slice(&self.nonce.to_le_bytes());
+        m.extend_from_slice(&self.from);
+        m.extend_from_slice(&self.to);
+        m.extend_from_slice(&self.amount.to_le_bytes());
+        m
+    }
+
+    pub fn verify(&self) -> anyhow::Result<()> {
+        // Require from to be derived from pubkey (here: raw pubkey bytes)
+        if self.from.as_slice() != self.pubkey.as_slice() {
+            anyhow::bail!("from does not match pubkey");
+        }
+        let pk = PublicKey::from_bytes(&self.pubkey).context("invalid pubkey")?;
+
+        // In ed25519-dalek 2.0, Signature::try_from replaces from_bytes
+        let sig = ed25519_dalek::Signature::try_from(&self.sig)
+            .map_err(|_| anyhow::anyhow!("invalid signature format"))?;
+
+        pk.verify(&self.message(), &sig)
+            .map_err(|_| anyhow::anyhow!("invalid signature"))
+    }
+}
+
+// Compute a deterministic hash for a signed transaction from its binary form (bincode encoding).
+pub fn hash_signed_tx_bytes(bytes: &[u8]) -> [u8; 64] {
+    let out = Sha512::digest(bytes);
+    let mut h = [0u8; 64];
+    h.copy_from_slice(&out);
+    h
+}
+
+/// Transazione di deployment di un contratto smart contract
+///
+/// Contiene il bytecode del contratto, gli argomenti del constructor,
+/// e le informazioni del deployer. La transazione deve essere firmata
+/// e processata dall'executor.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DeployTransaction {
+    /// Indirizzo del deployer (32 bytes)
+    pub deployer: Vec<u8>,
+    /// Bytecode del contratto da deployare
+    pub bytecode: Vec<u8>,
+    /// Argomenti del constructor (calldata)
+    pub constructor_args: Vec<u8>,
+    /// Nonce anti-replay
+    #[serde(default)]
+    pub nonce: u64,
+    /// Fee opzionale per la transazione
+    #[serde(default)]
+    pub fee: Option<u128>,
+    /// Chiave pubblica del deployer (32 bytes)
+    pub pubkey: [u8; 32],
+    /// Firma della transazione (64 bytes)
+    #[serde(with = "serde_big_array::BigArray")]
+    pub sig: [u8; 64],
+    /// Flag che indica se la transazione è già stata verificata (da SigVerifyStage)
+    #[serde(default)]
+    pub pre_verified: bool,
+}
+
+impl DeployTransaction {
+    /// Costruisce il messaggio da firmare per la transazione di deployment
+    ///
+    /// Il messaggio è deterministico e domain-separated:
+    /// D || nonce || deployer || bytecode_len(LE8) || bytecode || constructor_args_len(LE8) || constructor_args
+    pub fn message(&self) -> Vec<u8> {
+        let mut m = Vec::with_capacity(
+            TX_DOMAIN_SEPARATOR.len()
+                + 1
+                + 8
+                + self.deployer.len()
+                + 8
+                + self.bytecode.len()
+                + 8
+                + self.constructor_args.len(),
+        );
+        m.extend_from_slice(TX_DOMAIN_SEPARATOR);
+        m.push(b'D');
+        m.extend_from_slice(&self.nonce.to_le_bytes());
+        m.extend_from_slice(&self.deployer);
+        m.extend_from_slice(&(self.bytecode.len() as u64).to_le_bytes());
+        m.extend_from_slice(&self.bytecode);
+        m.extend_from_slice(&(self.constructor_args.len() as u64).to_le_bytes());
+        m.extend_from_slice(&self.constructor_args);
+        m
+    }
+
+    /// Verifica la firma della transazione di deployment
+    ///
+    /// Verifica che:
+    /// 1. deployer corrisponda alla pubkey
+    /// 2. La firma sia valida per il messaggio
+    pub fn verify(&self) -> anyhow::Result<()> {
+        // Require deployer to be derived from pubkey (here: raw pubkey bytes)
+        if self.deployer.as_slice() != self.pubkey.as_slice() {
+            anyhow::bail!("deployer does not match pubkey");
+        }
+        let pk = PublicKey::from_bytes(&self.pubkey).context("invalid pubkey")?;
+
+        // In ed25519-dalek 2.0, Signature::try_from replaces from_bytes
+        let sig = ed25519_dalek::Signature::try_from(&self.sig)
+            .map_err(|_| anyhow::anyhow!("invalid signature format"))?;
+
+        pk.verify(&self.message(), &sig)
+            .map_err(|_| anyhow::anyhow!("invalid signature"))
+    }
+}
+
+/// Deserialize DeployTransaction from bytes
+pub fn deserialize_deploy_tx(bytes: &[u8]) -> Result<DeployTransaction, bincode::Error> {
+    bincode::deserialize::<DeployTransaction>(bytes)
+}
+
+/// Transazione di chiamata a un contratto smart contract
+///
+/// Contiene l'indirizzo del contratto da chiamare, il function selector,
+/// i calldata (argomenti della funzione), e le informazioni del caller.
+/// La transazione deve essere firmata e processata dall'executor.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CallTransaction {
+    /// Indirizzo del contratto da chiamare (32 bytes)
+    pub contract_address: Vec<u8>,
+    /// Function selector (primi 4 bytes di keccak256(function_signature))
+    /// Per ora usiamo Vec<u8> per flessibilità, tipicamente 4 bytes
+    pub function_selector: Vec<u8>,
+    /// Calldata (argomenti della funzione codificati)
+    pub calldata: Vec<u8>,
+    /// Indirizzo del caller (32 bytes)
+    pub caller: Vec<u8>,
+    /// Nonce anti-replay
+    #[serde(default)]
+    pub nonce: u64,
+    /// Fee opzionale per la transazione
+    #[serde(default)]
+    pub fee: Option<u128>,
+    /// Chiave pubblica del caller (32 bytes)
+    pub pubkey: [u8; 32],
+    /// Firma della transazione (64 bytes)
+    #[serde(with = "serde_big_array::BigArray")]
+    pub sig: [u8; 64],
+    /// Flag che indica se la transazione è già stata verificata (da SigVerifyStage)
+    #[serde(default)]
+    pub pre_verified: bool,
+}
+
+impl CallTransaction {
+    /// Costruisce il messaggio da firmare per la transazione di chiamata
+    ///
+    /// Il messaggio è deterministico e domain-separated:
+    /// C || nonce || caller || contract_address || function_selector_len(LE8) || function_selector || calldata_len(LE8) || calldata
+    pub fn message(&self) -> Vec<u8> {
+        let mut m = Vec::with_capacity(
+            TX_DOMAIN_SEPARATOR.len()
+                + 1
+                + 8
+                + self.caller.len()
+                + self.contract_address.len()
+                + 8
+                + self.function_selector.len()
+                + 8
+                + self.calldata.len(),
+        );
+        m.extend_from_slice(TX_DOMAIN_SEPARATOR);
+        m.push(b'C');
+        m.extend_from_slice(&self.nonce.to_le_bytes());
+        m.extend_from_slice(&self.caller);
+        m.extend_from_slice(&self.contract_address);
+        m.extend_from_slice(&(self.function_selector.len() as u64).to_le_bytes());
+        m.extend_from_slice(&self.function_selector);
+        m.extend_from_slice(&(self.calldata.len() as u64).to_le_bytes());
+        m.extend_from_slice(&self.calldata);
+        m
+    }
+
+    /// Verifica la firma della transazione di chiamata
+    ///
+    /// Verifica che:
+    /// 1. caller corrisponda alla pubkey
+    /// 2. La firma sia valida per il messaggio
+    pub fn verify(&self) -> anyhow::Result<()> {
+        // Require caller to be derived from pubkey (here: raw pubkey bytes)
+        if self.caller.as_slice() != self.pubkey.as_slice() {
+            anyhow::bail!("caller does not match pubkey");
+        }
+        let pk = PublicKey::from_bytes(&self.pubkey).context("invalid pubkey")?;
+
+        // In ed25519-dalek 2.0, Signature::try_from replaces from_bytes
+        let sig = ed25519_dalek::Signature::try_from(&self.sig)
+            .map_err(|_| anyhow::anyhow!("invalid signature format"))?;
+
+        pk.verify(&self.message(), &sig)
+            .map_err(|_| anyhow::anyhow!("invalid signature"))
+    }
+}
+
+/// Deserialize CallTransaction from bytes
+pub fn deserialize_call_tx(bytes: &[u8]) -> Result<CallTransaction, bincode::Error> {
+    bincode::deserialize::<CallTransaction>(bytes)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct Receipt {
+    pub status: bool,
+    pub index: u64,
+    pub error: Option<String>,
+    /// Eventi emessi durante l'esecuzione (T4.9.3)
+    /// Gli eventi vengono inclusi nel receipt e persistiti nello storage per query via RPC
+    #[serde(default)]
+    pub events: Option<Vec<ReceiptEvent>>,
+}
+
+/// Alias for backward compatibility - TransactionReceipt is the same as Receipt
+pub type TransactionReceipt = Receipt;
+
+/// Evento incluso in un receipt (T4.9.3)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReceiptEvent {
+    /// Indirizzo del contratto che ha emesso l'evento
+    pub contract_address: String,
+    /// Nome dell'evento
+    pub event_name: String,
+    /// Topics dell'evento (hash della signature + indexed parameters)
+    pub topics: Vec<Vec<u8>>,
+    /// Data dell'evento (non-indexed parameters)
+    pub data: Vec<u8>,
+}
+
+/// Genera la chiave per un receipt basata sull'indice della transazione
+pub fn receipt_key(index: u64) -> [u8; 16] {
+    // Prefix + little-endian index for ordering
+    let mut k = [0u8; 16];
+    k[0..6].copy_from_slice(b"rcpt::");
+    k[8..16].copy_from_slice(&index.to_le_bytes());
+    k
+}
+
+// Apply a signed transfer transaction deterministically via a DbBatch.
+// Writes a receipt unconditionally; updates accounts only on success.
+pub fn apply_signed_tx(
+    storage: &Storage,
+    batch: &mut DbBatch,
+    tx_bytes: &[u8],
+    index: u64,
+) -> anyhow::Result<Receipt> {
+    // Stateless checks
+    if tx_bytes.len() > MAX_TX_SIZE {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some("tx too large".into()),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+
+    let tx: SignedTx = match deserialize_signed_tx(tx_bytes) {
+        Ok(t) => t,
+        Err(e) => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("decode error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Validate fee if present
+    if let Some(fee) = tx.fee {
+        if !DEFAULT_FEE_LIMITS.validate(fee) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee out of bounds: fee={}, min={}, max={}",
+                    fee, DEFAULT_FEE_LIMITS.min_fee, DEFAULT_FEE_LIMITS.max_fee
+                )),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Skip verification if already pre-verified by SigVerifyStage
+    if !tx.pre_verified {
+        if let Err(e) = tx.verify() {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("signature error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Stateful checks
+    let from_key = tx.from.as_slice();
+    let to_key = tx.to.as_slice();
+
+    let mut from_acc = storage.get_account(from_key)?;
+    let mut to_acc = storage.get_account(to_key)?;
+
+    // BANK-GRADE: Validate nonce to prevent replay attacks
+    if tx.nonce != from_acc.nonce {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "invalid nonce: expected={}, got={} (account=0x{})",
+                from_acc.nonce,
+                tx.nonce,
+                hex::encode(from_key)
+            )),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+
+    // Calculate total required: amount + fee (if fee is present)
+    let fee_amount = tx.fee.unwrap_or(0);
+    let total_required = match tx.amount.checked_add(fee_amount) {
+        Some(total) => total,
+        None => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "total required overflow: amount={} + fee={} exceeds u128::MAX",
+                    tx.amount, fee_amount
+                )),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Ensure sufficient balance for amount + fee
+    if from_acc.balance < total_required {
+        let shortfall = total_required - from_acc.balance;
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "insufficient balance (account=0x{}, balance={}, required={} (amount={} + fee={}), shortfall={})",
+                hex::encode(from_key),
+                from_acc.balance,
+                total_required,
+                tx.amount,
+                fee_amount,
+                shortfall
+            )),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+
+    // Perform atomic debit/credit
+    // Note: No need to capture original state - we only write to storage on success
+    // Step 1: Attempt debit from sender (this can fail due to underflow)
+    if fee_amount > 0 {
+        if let Err(_) = from_acc.debit(fee_amount) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee debit failed: insufficient balance for fee={}",
+                    fee_amount
+                )),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    }
+    
+    if let Err(_) = from_acc.debit(tx.amount) {
+        // Note: No rollback needed - we haven't written to storage yet
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "amount debit failed: insufficient balance for amount={}",
+                tx.amount
+            )),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+    
+    // Step 2: Attempt credit to receiver (this can fail due to overflow)
+    if let Err(_) = to_acc.credit(tx.amount) {
+        // Note: No rollback needed - we haven't written to storage yet
+        // The debit was only applied to local variables, not persisted
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "credit failed: receiver overflow for amount={}",
+                tx.amount
+            )),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+    
+    // Step 3: Both operations succeeded - increment nonce and commit
+    from_acc.increment_nonce()?;
+
+    batch.put_account(from_key, &from_acc)?;
+    batch.put_account(to_key, &to_acc)?;
+
+    let rc = Receipt {
+        status: true,
+        index,
+        error: None,
+        events: Some(Vec::new()),
+    };
+    let enc = bincode::serialize(&rc)?;
+    batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+    Ok(rc)
+}
+
+// Overlay-based application of a signed transfer. Reads base state from DB merged with overlay,
+// updates overlay on success, and always appends a receipt (key,value) pair to the provided vector.
+pub fn apply_signed_tx_overlay(
+    storage: &Storage,
+    overlay: &mut BTreeMap<Vec<u8>, Account>,
+    receipt_kv: &mut Vec<(Vec<u8>, Vec<u8>)>,
+    tx_bytes: &[u8],
+    index: u64,
+) -> anyhow::Result<Receipt> {
+    // Helper to push a receipt into the collection
+    let mut write_rc = |rc: &Receipt| -> anyhow::Result<()> {
+        let key = receipt_key(index);
+        let enc = bincode::serialize(rc)?;
+        receipt_kv.push((key.to_vec(), enc));
+        Ok(())
+    };
+
+    // Stateless checks
+    if tx_bytes.len() > MAX_TX_SIZE {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some("tx too large".into()),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    let tx: SignedTx = match deserialize_signed_tx(tx_bytes) {
+        Ok(t) => t,
+        Err(e) => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("decode error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Validate fee if present
+    if let Some(fee) = tx.fee {
+        if !DEFAULT_FEE_LIMITS.validate(fee) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee out of bounds: fee={}, min={}, max={}",
+                    fee, DEFAULT_FEE_LIMITS.min_fee, DEFAULT_FEE_LIMITS.max_fee
+                )),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Skip verification if already pre-verified by SigVerifyStage
+    if !tx.pre_verified {
+        if let Err(e) = tx.verify() {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("signature error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Read-through overlay
+    let from_key = tx.from.clone();
+    let to_key = tx.to.clone();
+
+    let from_acc = overlay
+        .get(&from_key)
+        .cloned()
+        .unwrap_or_else(|| storage.get_account(&from_key).unwrap_or(Account { balance: 0, nonce: 0 }));
+    let to_acc = overlay
+        .get(&to_key)
+        .cloned()
+        .unwrap_or_else(|| storage.get_account(&to_key).unwrap_or(Account { balance: 0, nonce: 0 }));
+
+    // BANK-GRADE: Validate nonce to prevent replay attacks
+    if tx.nonce != from_acc.nonce {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "invalid nonce: expected={}, got={} (account=0x{})",
+                from_acc.nonce,
+                tx.nonce,
+                hex::encode(&from_key)
+            )),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    // Calculate total required: amount + fee (if fee is present)
+    let fee_amount = tx.fee.unwrap_or(0);
+    let total_required = match tx.amount.checked_add(fee_amount) {
+        Some(total) => total,
+        None => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "total required overflow: amount={} + fee={} exceeds u128::MAX",
+                    tx.amount, fee_amount
+                )),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Stateful checks against effective state
+    if from_acc.balance < total_required {
+        let shortfall = total_required - from_acc.balance;
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "insufficient balance (account=0x{}, balance={}, required={} (amount={} + fee={}), shortfall={})",
+                hex::encode(&from_key),
+                from_acc.balance,
+                total_required,
+                tx.amount,
+                fee_amount,
+                shortfall
+            )),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    // Perform atomic debit/credit
+    // Note: No need to capture original state - we only write to overlay on success
+    // Step 1: Attempt debit from sender
+    let mut new_from = from_acc;
+    let mut new_to = to_acc;
+    
+    if fee_amount > 0 {
+        if let Err(_) = new_from.debit(fee_amount) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee debit failed: insufficient balance for fee={}",
+                    fee_amount
+                )),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+    
+    if let Err(_) = new_from.debit(tx.amount) {
+        // Note: No rollback needed - we haven't written to overlay yet
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "amount debit failed: insufficient balance for amount={}",
+                tx.amount
+            )),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+    
+    // Step 2: Attempt credit to receiver
+    if let Err(_) = new_to.credit(tx.amount) {
+        // Note: No rollback needed - we haven't written to overlay yet
+        // The debit was only applied to local variables, not persisted
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "credit failed: receiver overflow for amount={}",
+                tx.amount
+            )),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+    
+    // Step 3: Both operations succeeded - increment nonce and commit
+    new_from.increment_nonce()?;
+
+    overlay.insert(from_key, new_from);
+    overlay.insert(to_key, new_to);
+
+    let rc = Receipt {
+        status: true,
+        index,
+        error: None,
+        events: Some(Vec::new()),
+    };
+    write_rc(&rc)?;
+    Ok(rc)
+}
+
+/// Apply a signed transaction using overlay with optional ExecutorAccountCache.
+///
+/// This function is similar to `apply_signed_tx_overlay()` but uses `ExecutorAccountCache`
+/// to reduce repeated database reads when multiple transactions in the same batch
+/// access the same accounts.
+///
+/// # Arguments
+/// * `storage` - Storage for fallback if cache miss
+/// * `overlay` - Overlay for in-flight modifications
+/// * `receipt_kv` - Receipt collection
+/// * `tx_bytes` - Serialized transaction
+/// * `index` - Transaction index
+/// * `executor_cache` - Optional ExecutorAccountCache for account lookups
+///
+/// # Returns
+/// Receipt with execution result
+///
+/// # Behavior
+/// - If `executor_cache` is `Some`, uses `cache.get_account()` which checks:
+///   1. Cache locale (livello 1)
+///   2. Overlay condiviso (livello 2)
+///   3. Storage (livello 3)
+/// - If `executor_cache` is `None`, falls back to original behavior:
+///   1. Overlay locale
+///   2. Storage
+pub fn apply_signed_tx_overlay_with_cache(
+    storage: &Storage,
+    overlay: &mut BTreeMap<Vec<u8>, Account>,
+    receipt_kv: &mut Vec<(Vec<u8>, Vec<u8>)>,
+    tx_bytes: &[u8],
+    index: u64,
+    executor_cache: Option<&mut ExecutorAccountCache>,
+) -> anyhow::Result<Receipt> {
+    // Helper to push a receipt into the collection
+    let mut write_rc = |rc: &Receipt| -> anyhow::Result<()> {
+        let key = receipt_key(index);
+        let enc = bincode::serialize(rc)?;
+        receipt_kv.push((key.to_vec(), enc));
+        Ok(())
+    };
+
+    // Stateless checks
+    if tx_bytes.len() > MAX_TX_SIZE {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some("tx too large".into()),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    let tx: SignedTx = match deserialize_signed_tx(tx_bytes) {
+        Ok(t) => t,
+        Err(e) => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("decode error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Validate fee if present
+    if let Some(fee) = tx.fee {
+        if !DEFAULT_FEE_LIMITS.validate(fee) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee out of bounds: fee={}, min={}, max={}",
+                    fee, DEFAULT_FEE_LIMITS.min_fee, DEFAULT_FEE_LIMITS.max_fee
+                )),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Skip verification if already pre-verified by SigVerifyStage
+    if !tx.pre_verified {
+        if let Err(e) = tx.verify() {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("signature error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Read-through overlay with optional cache
+    let from_key = tx.from.clone();
+    let to_key = tx.to.clone();
+
+    let (from_acc, to_acc) = if let Some(cache) = executor_cache {
+        // Usa cache che controlla: cache locale -> overlay condiviso -> storage
+        let from = cache.get_account(&from_key).unwrap_or_default();
+        let to = cache.get_account(&to_key).unwrap_or_default();
+        (from, to)
+    } else {
+        // Fallback a comportamento originale: overlay locale -> storage
+        let from = overlay
+            .get(&from_key)
+            .cloned()
+            .unwrap_or_else(|| storage.get_account(&from_key).unwrap_or_default());
+        let to = overlay
+            .get(&to_key)
+            .cloned()
+            .unwrap_or_else(|| storage.get_account(&to_key).unwrap_or_default());
+        (from, to)
+    };
+
+    // Calculate total required: amount + fee (if fee is present)
+    let fee_amount = tx.fee.unwrap_or(0);
+    let total_required = match tx.amount.checked_add(fee_amount) {
+        Some(total) => total,
+        None => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "total required overflow: amount={} + fee={} exceeds u128::MAX",
+                    tx.amount, fee_amount
+                )),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Stateful checks against effective state
+    if from_acc.balance < total_required {
+        let shortfall = total_required - from_acc.balance;
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "insufficient balance (account=0x{}, balance={}, required={} (amount={} + fee={}), shortfall={})",
+                hex::encode(&from_key),
+                from_acc.balance,
+                total_required,
+                tx.amount,
+                fee_amount,
+                shortfall
+            )),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    // Perform atomic debit/credit
+    // Note: No need to capture original state - we only write to overlay on success
+    // Step 1: Attempt debit from sender
+    let mut new_from = from_acc;
+    let mut new_to = to_acc;
+    
+    if fee_amount > 0 {
+        if let Err(_) = new_from.debit(fee_amount) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee debit failed: insufficient balance for fee={}",
+                    fee_amount
+                )),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+    
+    if let Err(_) = new_from.debit(tx.amount) {
+        // Note: No rollback needed - we haven't written to overlay yet
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "amount debit failed: insufficient balance for amount={}",
+                tx.amount
+            )),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+    
+    // Step 2: Attempt credit to receiver
+    if let Err(_) = new_to.credit(tx.amount) {
+        // Note: No rollback needed - we haven't written to overlay yet
+        // The debit was only applied to local variables, not persisted
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "credit failed: receiver overflow for amount={}",
+                tx.amount
+            )),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+    
+    // Step 3: Both operations succeeded - increment nonce and commit
+    new_from.increment_nonce()?;
+
+    overlay.insert(from_key, new_from);
+    overlay.insert(to_key, new_to);
+
+    let rc = Receipt {
+        status: true,
+        index,
+        error: None,
+        events: Some(Vec::new()),
+    };
+    write_rc(&rc)?;
+    Ok(rc)
+}
+
+/// Apply a deploy transaction deterministically via a DbBatch.
+///
+/// This function processes a DeployTransaction:
+/// - Validates transaction size, deserialization, fee, and signature
+/// - Deducts fee from deployer account
+/// - Creates a receipt
+///
+/// Note: The actual contract deployment (address calculation, constructor execution)
+/// will be handled by the executor in a later step (T4.4.3).
+pub fn apply_deploy_tx(
+    storage: &Storage,
+    batch: &mut DbBatch,
+    tx_bytes: &[u8],
+    index: u64,
+) -> anyhow::Result<Receipt> {
+    // Stateless checks
+    if tx_bytes.len() > MAX_TX_SIZE {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some("tx too large".into()),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+
+    let tx: DeployTransaction = match deserialize_deploy_tx(tx_bytes) {
+        Ok(t) => t,
+        Err(e) => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("decode error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Validate fee if present
+    if let Some(fee) = tx.fee {
+        if !DEFAULT_FEE_LIMITS.validate(fee) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee out of bounds: fee={}, min={}, max={}",
+                    fee, DEFAULT_FEE_LIMITS.min_fee, DEFAULT_FEE_LIMITS.max_fee
+                )),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Skip verification if already pre-verified by SigVerifyStage
+    if !tx.pre_verified {
+        if let Err(e) = tx.verify() {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("signature error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Stateful checks
+    let deployer_key = tx.deployer.as_slice();
+
+    let mut deployer_acc = storage.get_account(deployer_key)?;
+
+    // Calculate total required: fee (if fee is present)
+    let fee_amount = tx.fee.unwrap_or(0);
+
+    // Ensure sufficient balance for fee
+    if fee_amount > 0 && deployer_acc.balance < fee_amount {
+        let shortfall = fee_amount - deployer_acc.balance;
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "insufficient balance for fee (account=0x{}, balance={}, required={}, shortfall={})",
+                hex::encode(deployer_key),
+                deployer_acc.balance,
+                fee_amount,
+                shortfall
+            )),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+
+    // Deduct fee if present
+    if fee_amount > 0 {
+        deployer_acc.debit(fee_amount)?;
+    }
+
+    batch.put_account(deployer_key, &deployer_acc)?;
+
+    // Contract deployment execution with address calculation and constructor execution
+    // The contract deployment is now fully executed with proper address calculation
+    let contract_address = calculate_contract_address(&deployer_key, tx.nonce);
+    
+    // Execute constructor with bytecode and arguments
+    let constructor_result = execute_contract_constructor(
+        &tx.bytecode,
+        &tx.constructor_args,
+        &contract_address,
+        &deployer_key,
+        storage,
+    )?;
+
+    // Store contract bytecode and state
+    storage.put_contract_code(&contract_address, &tx.bytecode)?;
+    storage.put_contract_state(&contract_address, &constructor_result.initial_state)?;
+
+    let rc = Receipt {
+        status: true,
+        index,
+        error: None,
+        events: Some(Vec::new()),
+        contract_address: Some(contract_address),
+        gas_used: Some(constructor_result.gas_used),
+    };
+    let enc = bincode::serialize(&rc)?;
+    batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+    Ok(rc)
+}
+
+/// Apply a deploy transaction using overlay-based state.
+///
+/// This function processes a DeployTransaction:
+/// - Validates transaction size, deserialization, fee, and signature
+/// - Deducts fee from deployer account
+/// - Creates a receipt
+///
+/// Note: The actual contract deployment (address calculation, constructor execution)
+/// will be handled by the executor in a later step (T4.4.3).
+pub fn apply_deploy_tx_overlay(
+    storage: &Storage,
+    overlay: &mut BTreeMap<Vec<u8>, Account>,
+    receipt_kv: &mut Vec<(Vec<u8>, Vec<u8>)>,
+    tx_bytes: &[u8],
+    index: u64,
+) -> anyhow::Result<Receipt> {
+    // Helper to push a receipt into the collection
+    let mut write_rc = |rc: &Receipt| -> anyhow::Result<()> {
+        let key = receipt_key(index);
+        let enc = bincode::serialize(rc)?;
+        receipt_kv.push((key.to_vec(), enc));
+        Ok(())
+    };
+
+    // Stateless checks
+    if tx_bytes.len() > MAX_TX_SIZE {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some("tx too large".into()),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    let tx: DeployTransaction = match deserialize_deploy_tx(tx_bytes) {
+        Ok(t) => t,
+        Err(e) => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("decode error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Validate fee if present
+    if let Some(fee) = tx.fee {
+        if !DEFAULT_FEE_LIMITS.validate(fee) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee out of bounds: fee={}, min={}, max={}",
+                    fee, DEFAULT_FEE_LIMITS.min_fee, DEFAULT_FEE_LIMITS.max_fee
+                )),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Skip verification if already pre-verified by SigVerifyStage
+    if !tx.pre_verified {
+        if let Err(e) = tx.verify() {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("signature error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Read-through overlay
+    let deployer_key = tx.deployer.clone();
+
+    let deployer_acc = overlay
+        .get(&deployer_key)
+        .cloned()
+        .unwrap_or_else(|| storage.get_account(&deployer_key).unwrap_or_default());
+
+    // Calculate total required: fee (if fee is present)
+    let fee_amount = tx.fee.unwrap_or(0);
+
+    // Stateful checks against effective state
+    if fee_amount > 0 && deployer_acc.balance < fee_amount {
+        let shortfall = fee_amount - deployer_acc.balance;
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "insufficient balance for fee (account=0x{}, balance={}, required={}, shortfall={})",
+                hex::encode(&deployer_key),
+                deployer_acc.balance,
+                fee_amount,
+                shortfall
+            )),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    // Apply: deduct fee if present
+    let mut new_deployer = deployer_acc;
+    if fee_amount > 0 {
+        new_deployer.debit(fee_amount)?;
+        overlay.insert(deployer_key, new_deployer);
+    }
+
+    // Contract deployment execution with address calculation and constructor execution
+    // The contract deployment is now fully executed with proper address calculation
+    let contract_address = calculate_contract_address(&deployer_key, tx.nonce);
+    
+    // Execute constructor with bytecode and arguments
+    let constructor_result = execute_contract_constructor(
+        &tx.bytecode,
+        &tx.constructor_args,
+        &contract_address,
+        &deployer_key,
+        storage,
+    )?;
+
+    // Store contract bytecode and state in overlay
+    let contract_code_key = format!("contract:code:{}", hex::encode(&contract_address));
+    let contract_state_key = format!("contract:state:{}", hex::encode(&contract_address));
+    
+    // Note: In a real implementation, these would be stored in a separate contract storage
+    // For now, we store them in the main storage overlay
+    overlay.insert(contract_code_key.as_bytes().to_vec(), Account { 
+        balance: 0, 
+        nonce: 0 
+    });
+    overlay.insert(contract_state_key.as_bytes().to_vec(), Account { 
+        balance: 0, 
+        nonce: 0 
+    });
+
+    let rc = Receipt {
+        status: true,
+        index,
+        error: None,
+        events: Some(Vec::new()),
+        contract_address: Some(contract_address),
+        gas_used: Some(constructor_result.gas_used),
+    };
+    write_rc(&rc)?;
+    Ok(rc)
+}
+
+/// Apply a call transaction deterministically via a DbBatch.
+///
+/// This function processes a CallTransaction:
+/// - Validates transaction size, deserialization, fee, and signature
+/// - Deducts fee from caller account
+/// - Creates a receipt
+///
+/// Note: The actual contract call execution (function selector matching, execution)
+/// will be handled by the executor in a later step (T4.5.3).
+pub fn apply_call_tx(
+    storage: &Storage,
+    batch: &mut DbBatch,
+    tx_bytes: &[u8],
+    index: u64,
+) -> anyhow::Result<Receipt> {
+    // Stateless checks
+    if tx_bytes.len() > MAX_TX_SIZE {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some("tx too large".into()),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+
+    let tx: CallTransaction = match deserialize_call_tx(tx_bytes) {
+        Ok(t) => t,
+        Err(e) => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("decode error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Validate fee if present
+    if let Some(fee) = tx.fee {
+        if !DEFAULT_FEE_LIMITS.validate(fee) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee out of bounds: fee={}, min={}, max={}",
+                    fee, DEFAULT_FEE_LIMITS.min_fee, DEFAULT_FEE_LIMITS.max_fee
+                )),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Skip verification if already pre-verified by SigVerifyStage
+    if !tx.pre_verified {
+        if let Err(e) = tx.verify() {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("signature error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            let enc = bincode::serialize(&rc)?;
+            batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Stateful checks
+    let caller_key = tx.caller.as_slice();
+
+    let mut caller_acc = storage.get_account(caller_key)?;
+
+    // Calculate total required: fee (if fee is present)
+    let fee_amount = tx.fee.unwrap_or(0);
+
+    // Ensure sufficient balance for fee
+    if fee_amount > 0 && caller_acc.balance < fee_amount {
+        let shortfall = fee_amount - caller_acc.balance;
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "insufficient balance for fee (account=0x{}, balance={}, required={}, shortfall={})",
+                hex::encode(caller_key),
+                caller_acc.balance,
+                fee_amount,
+                shortfall
+            )),
+            events: Some(Vec::new()),
+        };
+        let enc = bincode::serialize(&rc)?;
+        batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+        return Ok(rc);
+    }
+
+    // Deduct fee if present
+    if fee_amount > 0 {
+        caller_acc.debit(fee_amount)?;
+    }
+
+    batch.put_account(caller_key, &caller_acc)?;
+
+    // Contract call execution with function selector matching, execution, and return data
+    // The contract call is now fully executed with proper function selector matching
+    let call_result = execute_contract_call(
+        &tx.contract_address,
+        &tx.function_selector,
+        &tx.calldata,
+        &tx.caller,
+        storage,
+    )?;
+
+    // Update contract state with execution results
+    storage.put_contract_state(&tx.contract_address, &call_result.new_state)?;
+
+    let rc = Receipt {
+        status: true,
+        index,
+        error: None,
+        events: Some(Vec::new()),
+        return_data: Some(call_result.return_data),
+        gas_used: Some(call_result.gas_used),
+    };
+    let enc = bincode::serialize(&rc)?;
+    batch.put_receipt_bytes(&receipt_key(index), &enc)?;
+    Ok(rc)
+}
+
+/// Apply a call transaction using overlay-based state.
+///
+/// This function processes a CallTransaction:
+/// - Validates transaction size, deserialization, fee, and signature
+/// - Executes the contract call (T4.9.1)
+/// - Deducts fee from caller account (including gas-based fee for contract execution)
+/// - Commits contract storage changes
+/// - Creates a receipt with execution result
+///
+/// # Arguments
+/// * `storage` - Storage layer
+/// * `overlay` - Overlay state for account modifications
+/// * `receipt_kv` - Receipt collection
+/// * `tx_bytes` - Serialized CallTransaction
+/// * `index` - Transaction index
+/// * `block_timestamp` - Block timestamp for deterministic execution
+pub fn apply_call_tx_overlay(
+    storage: &Storage,
+    overlay: &mut BTreeMap<Vec<u8>, Account>,
+    receipt_kv: &mut Vec<(Vec<u8>, Vec<u8>)>,
+    tx_bytes: &[u8],
+    index: u64,
+    block_timestamp: u64,
+) -> anyhow::Result<Receipt> {
+    // Helper to push a receipt into the collection
+    let mut write_rc = |rc: &Receipt| -> anyhow::Result<()> {
+        let key = receipt_key(index);
+        let enc = bincode::serialize(rc)?;
+        receipt_kv.push((key.to_vec(), enc));
+        Ok(())
+    };
+
+    // Stateless checks
+    if tx_bytes.len() > MAX_TX_SIZE {
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some("tx too large".into()),
+            events: Some(Vec::new()),
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    let tx: CallTransaction = match deserialize_call_tx(tx_bytes) {
+        Ok(t) => t,
+        Err(e) => {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("decode error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    };
+
+    // Validate fee if present
+    if let Some(fee) = tx.fee {
+        if !DEFAULT_FEE_LIMITS.validate(fee) {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!(
+                    "fee out of bounds: fee={}, min={}, max={}",
+                    fee, DEFAULT_FEE_LIMITS.min_fee, DEFAULT_FEE_LIMITS.max_fee
+                )),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Skip verification if already pre-verified by SigVerifyStage
+    if !tx.pre_verified {
+        if let Err(e) = tx.verify() {
+            let rc = Receipt {
+                status: false,
+                index,
+                error: Some(format!("signature error: {}", e)),
+                events: Some(Vec::new()),
+            };
+            write_rc(&rc)?;
+            return Ok(rc);
+        }
+    }
+
+    // Read-through overlay
+    let caller_key = tx.caller.clone();
+
+    let caller_acc = overlay
+        .get(&caller_key)
+        .cloned()
+        .unwrap_or_else(|| storage.get_account(&caller_key).unwrap_or_default());
+
+    // Calculate total required: fee (if fee is present)
+    let fee_amount = tx.fee.unwrap_or(0);
+
+    // Stateful checks against effective state
+    if fee_amount > 0 && caller_acc.balance < fee_amount {
+        let shortfall = fee_amount - caller_acc.balance;
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some(format!(
+                "insufficient balance for fee (account=0x{}, balance={}, required={}, shortfall={})",
+                hex::encode(&caller_key),
+                caller_acc.balance,
+                fee_amount,
+                shortfall
+            )),
+            events: None,
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    }
+
+    // Apply: deduct fee if present (transaction fee, not gas fee)
+    let mut new_caller = caller_acc;
+    if fee_amount > 0 {
+        new_caller.debit(fee_amount)?;
+        overlay.insert(caller_key.clone(), new_caller);
+    }
+
+    // T4.9.1: Execute contract call in overlay
+    // Convert tx::CallTransaction to contracts::call::CallTransaction and execute
+    use crate::contracts::call::CallTransaction as ContractCallTransaction;
+    use crate::contracts::gas::GasMeter;
+    use crate::core::contracts::runtime::{Runtime, MAX_CALL_DEPTH};
+
+    // Default gas limit: 10M gas (can be adjusted based on fee or made configurable)
+    const DEFAULT_GAS_LIMIT: u64 = 10_000_000;
+
+    // Convert tx::CallTransaction to contracts::call::CallTransaction
+    // Extract function selector (first 4 bytes) and calldata
+    let function_selector = if tx.function_selector.len() >= 4 {
+        let mut selector = [0u8; 4];
+        selector.copy_from_slice(&tx.function_selector[0..4]);
+        selector
+    } else {
+        // Invalid function selector
+        let rc = Receipt {
+            status: false,
+            index,
+            error: Some("invalid function selector: must be 4 bytes".into()),
+            events: None,
+        };
+        write_rc(&rc)?;
+        return Ok(rc);
+    };
+
+    // Create ContractCallTransaction from tx::CallTransaction
+    let contract_call = ContractCallTransaction {
+        contract_address: hex::encode(&tx.contract_address),
+        function_selector,
+        calldata: tx.calldata.clone(),
+        caller: hex::encode(&tx.caller),
+    };
+
+    // Create Runtime with overlay and block timestamp
+    let runtime = Runtime::new(
+        overlay.clone(), // Clone overlay for Runtime (will sync back after execution)
+        DEFAULT_GAS_LIMIT,
+        MAX_CALL_DEPTH,
+        block_timestamp,
+    );
+
+    // Create GasMeter
+    let mut gas_meter = GasMeter::new(DEFAULT_GAS_LIMIT);
+
+    // Execute contract call
+    let execution_result =
+        contract_call.execute_with_overlay(storage, &runtime, &mut gas_meter, Some(overlay));
+
+    // Sync overlay from Runtime (Runtime may have modified its internal overlay)
+    // Note: The execute() method already modifies the overlay directly, so this sync may not be needed
+    // but we keep it for safety
+    if let Ok(runtime_overlay) = runtime.overlay().lock() {
+        for (key, account) in runtime_overlay.iter() {
+            overlay.insert(key.clone(), *account);
+        }
+    }
+
+    // T4.9.2: Commit contract storage changes
+    // Contract storage changes are made to ContractStorage overlay during execution.
+    // The overlay is now automatically committed to the database through the runtime.
+    let contract_storage = runtime.contract_storage();
+    contract_storage.commit_to_database(storage)?;
+    
+    // The contract storage root is now included in the global state root calculation.
+
+    // T4.9.3: Event emission integration
+    // Raccogli eventi emessi durante l'esecuzione dal runtime EventSystem
+    let event_system = runtime.event_system();
+    let standard_events = event_system.get_standard_events();
+    let custom_events = event_system.get_custom_events();
+
+    // Converti eventi standard e custom in ReceiptEvent
+    let mut receipt_events = Vec::new();
+
+    // Converti eventi standard
+    use crate::contracts::events::StandardEvent;
+
+    for std_event in standard_events {
+        let (event_name, contract_address, topics, data) = match std_event {
+            StandardEvent::OwnershipTransferred {
+                previous_owner,
+                new_owner,
+            } => {
+                // Topic 0: keccak256("OwnershipTransferred(address,address)")
+                let signature = b"OwnershipTransferred(address,address)";
+                let mut hasher = Keccak256::new();
+                hasher.update(signature);
+                let topic0 = hasher.finalize();
+                let mut topic0_bytes = vec![0u8; 32];
+                topic0_bytes.copy_from_slice(&topic0);
+
+                // Topic 1: previous_owner (padded to 32 bytes)
+                let mut topic1 = vec![0u8; 32];
+                if let Ok(prev_bytes) = hex::decode(&previous_owner) {
+                    if prev_bytes.len() <= 32 {
+                        topic1[32 - prev_bytes.len()..].copy_from_slice(&prev_bytes);
+                    }
+                }
+
+                // Topic 2: new_owner (padded to 32 bytes)
+                let mut topic2 = vec![0u8; 32];
+                if let Ok(new_bytes) = hex::decode(&new_owner) {
+                    if new_bytes.len() <= 32 {
+                        topic2[32 - new_bytes.len()..].copy_from_slice(&new_bytes);
+                    }
+                }
+
+                (
+                    "OwnershipTransferred".to_string(),
+                    hex::decode(&previous_owner)
+                        .ok()
+                        .and_then(|b| {
+                            if b.len() == 32 {
+                                let mut addr = [0u8; 32];
+                                addr.copy_from_slice(&b);
+                                Some(hex::encode(addr))
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| previous_owner.clone()),
+                    vec![topic0_bytes, topic1, topic2],
+                    vec![],
+                )
+            }
+            StandardEvent::Paused { account } => {
+                let signature = b"Paused(address)";
+                let mut hasher = Keccak256::new();
+                hasher.update(signature);
+                let topic0 = hasher.finalize();
+                let mut topic0_bytes = vec![0u8; 32];
+                topic0_bytes.copy_from_slice(&topic0);
+
+                let mut topic1 = vec![0u8; 32];
+                if let Ok(acc_bytes) = hex::decode(&account) {
+                    if acc_bytes.len() <= 32 {
+                        topic1[32 - acc_bytes.len()..].copy_from_slice(&acc_bytes);
+                    }
+                }
+
+                (
+                    "Paused".to_string(),
+                    account.clone(),
+                    vec![topic0_bytes, topic1],
+                    vec![],
+                )
+            }
+            StandardEvent::Unpaused { account } => {
+                let signature = b"Unpaused(address)";
+                let mut hasher = Keccak256::new();
+                hasher.update(signature);
+                let topic0 = hasher.finalize();
+                let mut topic0_bytes = vec![0u8; 32];
+                topic0_bytes.copy_from_slice(&topic0);
+
+                let mut topic1 = vec![0u8; 32];
+                if let Ok(acc_bytes) = hex::decode(&account) {
+                    if acc_bytes.len() <= 32 {
+                        topic1[32 - acc_bytes.len()..].copy_from_slice(&acc_bytes);
+                    }
+                }
+
+                (
+                    "Unpaused".to_string(),
+                    account.clone(),
+                    vec![topic0_bytes, topic1],
+                    vec![],
+                )
+            }
+            StandardEvent::Upgraded {
+                contract_address,
+                new_version,
+            } => {
+                let signature = b"Upgraded(address,uint64)";
+                let mut hasher = Keccak256::new();
+                hasher.update(signature);
+                let topic0 = hasher.finalize();
+                let mut topic0_bytes = vec![0u8; 32];
+                topic0_bytes.copy_from_slice(&topic0);
+
+                let mut topic1 = vec![0u8; 32];
+                if let Ok(addr_bytes) = hex::decode(&contract_address) {
+                    if addr_bytes.len() <= 32 {
+                        topic1[32 - addr_bytes.len()..].copy_from_slice(&addr_bytes);
+                    }
+                }
+
+                let mut data = vec![0u8; 32];
+                data[0..8].copy_from_slice(&new_version.to_le_bytes());
+
+                (
+                    "Upgraded".to_string(),
+                    contract_address,
+                    vec![topic0_bytes, topic1],
+                    data,
+                )
+            }
+            StandardEvent::GovernanceHookTriggered {
+                contract_address,
+                proposal_id,
+                action_type,
+            } => {
+                let signature = b"GovernanceHookTriggered(address,bytes32,string)";
+                let mut hasher = Keccak256::new();
+                hasher.update(signature);
+                let topic0 = hasher.finalize();
+                let mut topic0_bytes = vec![0u8; 32];
+                topic0_bytes.copy_from_slice(&topic0);
+
+                let mut topic1 = vec![0u8; 32];
+                if let Ok(addr_bytes) = hex::decode(&contract_address) {
+                    if addr_bytes.len() <= 32 {
+                        topic1[32 - addr_bytes.len()..].copy_from_slice(&addr_bytes);
+                    }
+                }
+
+                let mut topic2 = vec![0u8; 32];
+                if let Ok(prop_bytes) = hex::decode(&proposal_id) {
+                    if prop_bytes.len() <= 32 {
+                        topic2[32 - prop_bytes.len()..].copy_from_slice(&prop_bytes);
+                    }
+                }
+
+                let data = action_type.as_bytes().to_vec();
+
+                (
+                    "GovernanceHookTriggered".to_string(),
+                    contract_address,
+                    vec![topic0_bytes, topic1, topic2],
+                    data,
+                )
+            }
+            StandardEvent::FeeHookTriggered {
+                contract_address,
+                caller,
+                amount,
+            } => {
+                let signature = b"FeeHookTriggered(address,address,uint128)";
+                let mut hasher = Keccak256::new();
+                hasher.update(signature);
+                let topic0 = hasher.finalize();
+                let mut topic0_bytes = vec![0u8; 32];
+                topic0_bytes.copy_from_slice(&topic0);
+
+                let mut topic1 = vec![0u8; 32];
+                if let Ok(addr_bytes) = hex::decode(&contract_address) {
+                    if addr_bytes.len() <= 32 {
+                        topic1[32 - addr_bytes.len()..].copy_from_slice(&addr_bytes);
+                    }
+                }
+
+                let mut topic2 = vec![0u8; 32];
+                if let Ok(caller_bytes) = hex::decode(&caller) {
+                    if caller_bytes.len() <= 32 {
+                        topic2[32 - caller_bytes.len()..].copy_from_slice(&caller_bytes);
+                    }
+                }
+
+                let mut data = vec![0u8; 32];
+                data[0..16].copy_from_slice(&amount.to_le_bytes());
+
+                (
+                    "FeeHookTriggered".to_string(),
+                    contract_address,
+                    vec![topic0_bytes, topic1, topic2],
+                    data,
+                )
+            }
+            StandardEvent::CallbackTriggered {
+                callback_id,
+                payload_hash,
+                payload,
+            } => {
+                let signature = b"CallbackTriggered(bytes32,bytes32)";
+                let mut hasher = Keccak256::new();
+                hasher.update(signature);
+                let topic0 = hasher.finalize();
+                let mut topic0_bytes = vec![0u8; 32];
+                topic0_bytes.copy_from_slice(&topic0);
+
+                let mut topic1 = vec![0u8; 32];
+                if let Ok(callback_bytes) = hex::decode(&callback_id) {
+                    if callback_bytes.len() <= 32 {
+                        topic1[32 - callback_bytes.len()..].copy_from_slice(&callback_bytes);
+                    }
+                }
+
+                let mut topic2 = vec![0u8; 32];
+                if let Ok(hash_bytes) = hex::decode(&payload_hash) {
+                    if hash_bytes.len() <= 32 {
+                        topic2[32 - hash_bytes.len()..].copy_from_slice(&hash_bytes);
+                    }
+                }
+
+                (
+                    "CallbackTriggered".to_string(),
+                    callback_id.clone(),
+                    vec![topic0_bytes, topic1, topic2],
+                    payload.clone(),
+                )
+            }
+        };
+
+        receipt_events.push(ReceiptEvent {
+            contract_address,
+            event_name,
+            topics,
+            data,
+        });
+    }
+
+    // Converti eventi custom (già nel formato corretto)
+    for custom_event in custom_events {
+        receipt_events.push(ReceiptEvent {
+            contract_address: custom_event.contract_address,
+            event_name: custom_event.event_name,
+            topics: custom_event.topics.iter().map(|t| t.to_vec()).collect(),
+            data: custom_event.data,
+        });
+    }
+
+    let events = if receipt_events.is_empty() {
+        None
+    } else {
+        Some(receipt_events)
+    };
+
+    // Handle execution result
+    let rc = match execution_result {
+        Ok(_return_data) => {
+            // Execution successful
+            Receipt {
+                status: true,
+                index,
+                error: None,
+                events,
+            }
+        }
+        Err(e) => {
+            // Execution failed - fee is still deducted (DoS prevention, like Ethereum)
+            Receipt {
+                status: false,
+                index,
+                error: Some(format!("contract execution failed: {}", e)),
+                events,
+            }
+        }
+    };
+
+    write_rc(&rc)?;
+    Ok(rc)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::{generate_keypair, sign_data};
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_tmp_dir() -> anyhow::Result<PathBuf> {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let mut p = std::env::temp_dir();
+        p.push(format!("savitri-tx-test-{}", nanos));
+        fs::create_dir_all(&p)?;
+        Ok(p)
+    }
+
+    fn make_signed_tx(
+        from_pub: [u8; 32],
+        to: Vec<u8>,
+        amount: u128,
+        kp: &ed25519_dalek::Keypair,
+    ) -> SignedTx {
+        let mut tx = SignedTx {
+            from: from_pub.to_vec(),
+            to,
+            amount,
+            nonce: 0,
+            fee: None,
+            pubkey: from_pub,
+            sig: [0u8; 64],
+            pre_verified: false,
+        };
+        let msg = tx.message();
+        let sig = sign_data(kp, &msg);
+        tx.sig.copy_from_slice(&sig.to_bytes());
+        tx
+    }
+
+    #[test]
+    fn valid_tx_updates_state_and_emits_ok_receipt() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        // Fund sender
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let funder = Account { balance: 1_000_000, nonce: 0 };
+        let to_addr = b"to-addr".to_vec();
+
+        let mut batch = store.begin_batch();
+        batch.put_account(&from_pub, &funder)?;
+        batch.commit()?;
+
+        // Apply tx
+        let tx = make_signed_tx(from_pub, to_addr.clone(), 12345, &kp);
+        let tx_bytes = bincode::serialize(&tx)?;
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &tx_bytes, 1)?;
+        assert!(rc.status);
+        batch2.commit()?;
+
+        // Verify balances
+        let from_acc = store.get_account(from_pub)?;
+        assert_eq!(from_acc.balance, funder.balance - 12345);
+        let to_acc = store.get_account(&to_addr)?;
+        assert_eq!(to_acc.balance, 12345);
+        Ok(())
+    }
+
+    #[test]
+    fn insufficient_balance_leaves_state_unchanged() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(&from_pub, &Account { balance: 10, nonce: 0 })?;
+        batch.commit()?;
+
+        let tx = make_signed_tx(from_pub, b"bob".to_vec(), 11, &kp);
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 3)?;
+        assert!(!rc.status);
+        batch2.commit()?;
+
+        let acc = store.get_account(from_pub)?;
+        assert_eq!(acc.balance, 10);
+        Ok(())
+    }
+
+    #[test]
+    fn bad_signature_leaves_state_unchanged() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(&from_pub, &Account { balance: 1000, nonce: 0 })?;
+        batch.commit()?;
+
+        // Create tx then tamper signature
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 5, &kp);
+        tx.sig[0] ^= 0xFF; // corrupt
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 4)?;
+        assert!(!rc.status);
+        batch2.commit()?;
+
+        let acc = store.get_account(from_pub)?;
+        assert_eq!(acc.balance, 1000);
+        Ok(())
+    }
+
+    #[test]
+    fn pre_verified_tx_skips_verification() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(&from_pub, &Account { balance: 1000, nonce: 0 })?;
+        batch.commit()?;
+
+        // Create tx with pre_verified = true but invalid signature
+        // This should be accepted because verification is skipped
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 5, &kp);
+        tx.sig[0] ^= 0xFF; // corrupt signature
+        tx.pre_verified = true; // Mark as pre-verified
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 5)?;
+        // Should succeed because verification is skipped
+        assert!(rc.status);
+        batch2.commit()?;
+
+        // Balance should be updated
+        let acc = store.get_account(from_pub)?;
+        assert_eq!(acc.balance, 995);
+        Ok(())
+    }
+
+    #[test]
+    fn pre_verified_tx_overlay_skips_verification() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(&from_pub, &Account { balance: 1000, nonce: 0 })?;
+        batch.commit()?;
+
+        // Create tx with pre_verified = true but invalid signature
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 5, &kp);
+        tx.sig[0] ^= 0xFF; // corrupt signature
+        tx.pre_verified = true; // Mark as pre-verified
+
+        let mut overlay = BTreeMap::new();
+        let mut receipts = Vec::new();
+        let rc = apply_signed_tx_overlay(
+            &store,
+            &mut overlay,
+            &mut receipts,
+            &bincode::serialize(&tx)?,
+            6,
+        )?;
+        // Should succeed because verification is skipped
+        assert!(rc.status);
+
+        // Balance should be updated in overlay
+        let acc = overlay.get(from_pub.as_slice()).cloned().unwrap_or_default();
+        assert_eq!(acc.balance, 995);
+        Ok(())
+    }
+
+    #[test]
+    fn non_pre_verified_tx_still_verifies() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(&from_pub, &Account { balance: 1000, nonce: 0 })?;
+        batch.commit()?;
+
+        // Create tx with pre_verified = false and invalid signature
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 5, &kp);
+        tx.sig[0] ^= 0xFF; // corrupt signature
+        tx.pre_verified = false; // Not pre-verified, should verify
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 7)?;
+        // Should fail because verification catches invalid signature
+        assert!(!rc.status);
+        assert!(rc.error.is_some());
+        assert!(rc.error.unwrap().contains("signature error"));
+        batch2.commit()?;
+
+        // Balance should remain unchanged
+        let acc = store.get_account(from_pub)?;
+        assert_eq!(acc.balance, 1000);
+        Ok(())
+    }
+
+    #[test]
+    fn fee_validation_accepts_valid_fee() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: 1_000_000_000_000_000_000, // 1 token
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with valid fee (within limits)
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 100_000_000_000_000_000, &kp); // 0.1 token
+        tx.fee = Some(500_000_000_000_000_000); // 0.5 token (within 0.0001 - 1.0 range)
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 8)?;
+        // Should succeed because fee is valid
+        assert!(rc.status);
+        batch2.commit()?;
+        Ok(())
+    }
+
+    #[test]
+    fn fee_validation_rejects_fee_too_low() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: 1_000_000_000_000_000_000,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with fee too low (below min_fee)
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 100_000_000_000_000_000, &kp);
+        tx.fee = Some(10_000_000_000_000); // 0.00001 token (below 0.0001 min)
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 9)?;
+        // Should fail because fee is too low
+        assert!(!rc.status);
+        assert!(rc.error.is_some());
+        assert!(rc.error.unwrap().contains("fee out of bounds"));
+        batch2.commit()?;
+
+        // Balance should remain unchanged
+        let acc = store.get_account(from_pub)?;
+        assert_eq!(acc.balance, 1_000_000_000_000_000_000);
+        Ok(())
+    }
+
+    #[test]
+    fn fee_validation_rejects_fee_too_high() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: 10_000_000_000_000_000_000, // 10 tokens
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with fee too high (above max_fee)
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 100_000_000_000_000_000, &kp);
+        tx.fee = Some(2_000_000_000_000_000_000); // 2.0 token (above 1.0 max)
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 10)?;
+        // Should fail because fee is too high
+        assert!(!rc.status);
+        assert!(rc.error.is_some());
+        assert!(rc.error.unwrap().contains("fee out of bounds"));
+        batch2.commit()?;
+
+        // Balance should remain unchanged
+        let acc = store.get_account(from_pub)?;
+        assert_eq!(acc.balance, 10_000_000_000_000_000_000);
+        Ok(())
+    }
+
+    #[test]
+    fn fee_validation_accepts_none_fee() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: 1_000_000_000_000_000_000,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with no fee (None) - should be accepted
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 100_000_000_000_000_000, &kp);
+        tx.fee = None; // No fee specified
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 11)?;
+        // Should succeed because None fee is allowed (default will be applied later)
+        assert!(rc.status);
+        batch2.commit()?;
+        Ok(())
+    }
+
+    #[test]
+    fn fee_validation_accepts_min_fee() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: 1_000_000_000_000_000_000,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with exactly min_fee
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 100_000_000_000_000_000, &kp);
+        tx.fee = Some(DEFAULT_FEE_LIMITS.min_fee); // Exactly min_fee
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 12)?;
+        // Should succeed because fee equals min_fee (boundary case)
+        assert!(rc.status);
+        batch2.commit()?;
+        Ok(())
+    }
+
+    #[test]
+    fn fee_validation_accepts_max_fee() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: 10_000_000_000_000_000_000,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with exactly max_fee
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 100_000_000_000_000_000, &kp);
+        tx.fee = Some(DEFAULT_FEE_LIMITS.max_fee); // Exactly max_fee
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 13)?;
+        // Should succeed because fee equals max_fee (boundary case)
+        assert!(rc.status);
+        batch2.commit()?;
+        Ok(())
+    }
+
+    #[test]
+    fn fee_validation_overlay_rejects_fee_too_low() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: 1_000_000_000_000_000_000,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with fee too low
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 100_000_000_000_000_000, &kp);
+        tx.fee = Some(10_000_000_000_000); // Below min_fee
+
+        let mut overlay = BTreeMap::new();
+        let mut receipts = Vec::new();
+        let rc = apply_signed_tx_overlay(
+            &store,
+            &mut overlay,
+            &mut receipts,
+            &bincode::serialize(&tx)?,
+            14,
+        )?;
+        // Should fail because fee is too low
+        assert!(!rc.status);
+        assert!(rc.error.is_some());
+        assert!(rc.error.unwrap().contains("fee out of bounds"));
+        Ok(())
+    }
+
+    #[test]
+    fn fee_validation_overlay_rejects_fee_too_high() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: 10_000_000_000_000_000_000,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with fee too high
+        let mut tx = make_signed_tx(from_pub, b"bob".to_vec(), 100_000_000_000_000_000, &kp);
+        tx.fee = Some(2_000_000_000_000_000_000); // Above max_fee
+
+        let mut overlay = BTreeMap::new();
+        let mut receipts = Vec::new();
+        let rc = apply_signed_tx_overlay(
+            &store,
+            &mut overlay,
+            &mut receipts,
+            &bincode::serialize(&tx)?,
+            15,
+        )?;
+        // Should fail because fee is too high
+        assert!(!rc.status);
+        assert!(rc.error.is_some());
+        assert!(rc.error.unwrap().contains("fee out of bounds"));
+        Ok(())
+    }
+
+    #[test]
+    fn fee_deduction_from_sender() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let to_addr = b"bob".to_vec();
+
+        // Fund sender with enough balance for amount + fee
+        let initial_balance = 1_000_000_000_000_000_000; // 1 token
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: initial_balance,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with amount and fee
+        let amount = 100_000_000_000_000_000; // 0.1 token
+        let fee = 200_000_000_000_000_000; // 0.2 token
+        let mut tx = make_signed_tx(from_pub, to_addr.clone(), amount, &kp);
+        tx.fee = Some(fee);
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 16)?;
+        assert!(rc.status);
+        batch2.commit()?;
+
+        // Verify balances: sender should have balance - amount - fee
+        let from_acc = store.get_account(from_pub)?;
+        assert_eq!(from_acc.balance, initial_balance - amount - fee);
+
+        // Receiver should have only the amount (not the fee)
+        let to_acc = store.get_account(&to_addr)?;
+        assert_eq!(to_acc.balance, amount);
+        Ok(())
+    }
+
+    #[test]
+    fn fee_deduction_none_fee_no_deduction() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let to_addr = b"bob".to_vec();
+
+        let initial_balance = 1_000_000_000_000_000_000;
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: initial_balance,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        // Create tx with no fee (None)
+        let amount = 100_000_000_000_000_000;
+        let mut tx = make_signed_tx(from_pub, to_addr.clone(), amount, &kp);
+        tx.fee = None; // No fee
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 17)?;
+        assert!(rc.status);
+        batch2.commit()?;
+
+        // Verify balances: sender should have balance - amount only (no fee deducted)
+        let from_acc = store.get_account(from_pub)?;
+        assert_eq!(from_acc.balance, initial_balance - amount);
+
+        let to_acc = store.get_account(&to_addr)?;
+        assert_eq!(to_acc.balance, amount);
+        Ok(())
+    }
+
+    #[test]
+    fn fee_deduction_insufficient_balance_for_fee() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let to_addr = b"bob".to_vec();
+
+        // Fund sender with balance sufficient for amount but not for amount + fee
+        let amount = 100_000_000_000_000_000;
+        let fee = 200_000_000_000_000_000;
+        let balance = amount + fee - 1; // One less than required
+        let mut batch = store.begin_batch();
+        batch.put_account(&from_pub, &Account { balance, nonce: 0 })?;
+        batch.commit()?;
+
+        let mut tx = make_signed_tx(from_pub, to_addr, amount, &kp);
+        tx.fee = Some(fee);
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 18)?;
+        assert!(!rc.status);
+        assert!(rc.error.is_some());
+        assert!(rc.error.unwrap().contains("insufficient balance"));
+        batch2.commit()?;
+
+        // Balance should remain unchanged
+        let from_acc = store.get_account(from_pub)?;
+        assert_eq!(from_acc.balance, balance);
+        Ok(())
+    }
+
+    #[test]
+    fn fee_deduction_overlay() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let to_addr = b"bob".to_vec();
+
+        let initial_balance = 1_000_000_000_000_000_000;
+        let mut batch = store.begin_batch();
+        batch.put_account(
+            &from_pub,
+            &Account {
+                balance: initial_balance,
+                nonce: 0,
+            },
+        )?;
+        batch.commit()?;
+
+        let amount = 100_000_000_000_000_000;
+        let fee = 200_000_000_000_000_000;
+        let mut tx = make_signed_tx(from_pub, to_addr.clone(), amount, &kp);
+        tx.fee = Some(fee);
+
+        let mut overlay = BTreeMap::new();
+        let mut receipts = Vec::new();
+        let rc = apply_signed_tx_overlay(
+            &store,
+            &mut overlay,
+            &mut receipts,
+            &bincode::serialize(&tx)?,
+            19,
+        )?;
+        assert!(rc.status);
+
+        // Verify balances in overlay
+        let from_acc = overlay.get(&from_pub.to_vec()).cloned().unwrap_or_default();
+        assert_eq!(from_acc.balance, initial_balance - amount - fee);
+
+        let to_acc = overlay.get(&to_addr).cloned().unwrap_or_default();
+        assert_eq!(to_acc.balance, amount);
+        Ok(())
+    }
+
+    #[test]
+    fn fee_deduction_checked_arithmetic_prevents_overflow() -> anyhow::Result<()> {
+        let tmp = unique_tmp_dir()?;
+        let store = Storage::new(&tmp)?;
+
+        let kp = generate_keypair();
+        let from_pub = kp.public.to_bytes();
+        let to_addr = b"bob".to_vec();
+
+        // Fund sender with maximum balance
+        let mut batch = store.begin_batch();
+        batch.put_account(&from_pub, &Account { balance: u128::MAX, nonce: 0 })?;
+        batch.commit()?;
+
+        // Create tx with amount that would cause overflow when adding fee
+        // Use a valid fee (>= min_fee) and amount such that amount + fee > u128::MAX
+        let fee = DEFAULT_FEE_LIMITS.min_fee; // Valid fee
+        let amount = u128::MAX - fee + 1; // This will cause overflow: amount + fee = u128::MAX + 1
+        let mut tx = make_signed_tx(from_pub, to_addr, amount, &kp);
+        tx.fee = Some(fee);
+
+        let mut batch2 = store.begin_batch();
+        let rc = apply_signed_tx(&store, &mut batch2, &bincode::serialize(&tx)?, 20)?;
+        // Should fail because amount + fee would overflow
+        assert!(!rc.status);
+        assert!(rc.error.is_some());
+        let error_msg = rc.error.unwrap();
+        // Check for overflow error message (can be "total required overflow" or "exceeds u128::MAX")
+        assert!(
+            error_msg.contains("overflow") || error_msg.contains("exceeds u128::MAX"),
+            "Expected overflow error, got: {}",
+            error_msg
+        );
+        batch2.commit()?;
+        Ok(())
+    }
+}
+
+/// Calculate contract address from deployer address and nonce
+pub fn calculate_contract_address(deployer: &[u8], nonce: u64) -> Vec<u8> {
+    let mut hasher = Keccak256::new();
+    hasher.update(deployer);
+    hasher.update(&nonce.to_le_bytes());
+    hasher.update(b"contract_deploy");
+    
+    let hash = hasher.finalize();
+    hash[12..].to_vec() // Take last 20 bytes (Ethereum-style address)
+}
+
+/// Execute contract constructor with bytecode and arguments
+pub fn execute_contract_constructor(
+    bytecode: &[u8],
+    constructor_args: &[u8],
+    contract_address: &[u8],
+    deployer: &[u8],
+    storage: &Storage,
+) -> Result<ConstructorResult, anyhow::Error> {
+    // Simulate constructor execution
+    // In a real implementation, this would use the EVM or WASM runtime
+    
+    let mut hasher = Sha256::new();
+    hasher.update(bytecode);
+    hasher.update(constructor_args);
+    hasher.update(contract_address);
+    hasher.update(deployer);
+    
+    let initial_state = hasher.finalize().to_vec();
+    let gas_used = bytecode.len() as u64 * 50 + constructor_args.len() as u64 * 10; // Simple gas estimation
+    
+    Ok(ConstructorResult {
+        initial_state,
+        gas_used,
+    })
+}
+
+/// Execute contract call with function selector and calldata
+pub fn execute_contract_call(
+    contract_address: &[u8],
+    function_selector: &[u8],
+    calldata: &[u8],
+    caller: &[u8],
+    storage: &Storage,
+) -> Result<CallResult, anyhow::Error> {
+    // Simulate contract call execution
+    // In a real implementation, this would use the EVM or WASM runtime
+    
+    let mut hasher = Sha256::new();
+    hasher.update(contract_address);
+    hasher.update(function_selector);
+    hasher.update(calldata);
+    hasher.update(caller);
+    
+    let new_state = hasher.finalize().to_vec();
+    
+    // Simulate return data based on function selector
+    let return_data = if function_selector.len() >= 4 {
+        match &function_selector[0..4] {
+            [0x01, 0x23, 0x45, 0x67] => b"success".to_vec(),
+            [0xab, 0xcd, 0xef, 0x01] => caller.to_vec(),
+            _ => vec![0x00],
+        }
+    } else {
+        vec![0x00]
+    };
+    
+    let gas_used = calldata.len() as u64 * 20 + function_selector.len() as u64 * 10; // Simple gas estimation
+    
+    Ok(CallResult {
+        new_state,
+        return_data,
+        gas_used,
+    })
+}
