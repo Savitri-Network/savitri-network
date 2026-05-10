@@ -15,7 +15,7 @@ pub mod types; // Class-aware tx types (TxClass, MempoolTx, PrevalidatedTx, …)
                // pub mod legacy; // MOVED TO legacy_not_used/mempool_legacy.rs
 pub mod hybrid;
 pub mod sharded; // Experimental - for future high-concurrency edge nodes // Hybrid architecture: Sharded ingress + Monolithic production
-                                                                          // pub mod tests; // Advanced integration tests for atomic nonce resolution (temporarily disabled)
+                 // pub mod tests; // Advanced integration tests for atomic nonce resolution (temporarily disabled)
 pub mod simple_tests; // Simple working tests for atomic nonce resolution
 
 // Legacy mempool implementation has been moved to legacy_not_used/
