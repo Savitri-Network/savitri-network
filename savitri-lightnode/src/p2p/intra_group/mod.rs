@@ -213,6 +213,10 @@ pub struct IntraGroupCommunication {
     /// Per-group tracking enables independent parallel chains without height contention.
     pub last_certified_height: Arc<AtomicU64>,
     pub last_certified_height_per_group: Arc<std::sync::RwLock<HashMap<String, u64>>>,
+    /// V0.2 Phase 1 (Score Canonicity, issue #31) — canonical RTT state holder.
+    /// `None` until `set_latency_canon_state()` is called by the network task.
+    /// Reads via `latency_canon_state.as_ref()?.lookup_score(...)`.
+    pub latency_canon_state: Option<std::sync::Arc<crate::latency_canon_state::LatencyCanonState>>,
 }
 
 /// Cached PoU proposer schedule — 30-block tenure with zero-gap handoff.
@@ -961,6 +965,8 @@ impl IntraGroupCommunication {
             // Elected -> Producing -> SteppingDown -> Idle as elections fire.
             // Same Arc shared with the drift-detector task spawned above.
             proposer_sm: proposer_sm_for_diag,
+            // V0.2 Phase 1 (Score Canonicity, issue #31): wired by set_latency_canon_state()
+            latency_canon_state: None,
         }
     }
 
@@ -1823,6 +1829,96 @@ impl IntraGroupCommunication {
     }
 
     /// Determine proposer based on PoU scores and latency
+
+    // ─────────────────────────────────────────────────────────────────
+    // V0.2 Phase 1 (Score Canonicity, issue #31) — Latency Canon helpers
+    // ─────────────────────────────────────────────────────────────────
+
+    /// Install the LatencyCanonState. Called by the network task after
+    /// it constructs the state holder and subscribes to the gossip
+    /// topic. Subsequent calls overwrite — caller is expected to do
+    /// this exactly once per IGC instance.
+    pub fn set_latency_canon_state(
+        &mut self,
+        state: std::sync::Arc<crate::latency_canon_state::LatencyCanonState>,
+    ) {
+        self.latency_canon_state = Some(state);
+    }
+
+    /// Canonical gossip topic for this LN's current group:
+    /// `/savitri/group/<group_id>/latency_canon/1`.
+    pub async fn get_latency_canon_topic(&self) -> libp2p::gossipsub::IdentTopic {
+        let group_id = self
+            .group_manager
+            .get_current_group_cached()
+            .map(|g| g.group_id.clone())
+            .unwrap_or_default();
+        crate::latency_canon_publisher::topic_for_group(&group_id)
+    }
+
+    /// Receive-side: deserialize a `LatencyReport`, verify the signature,
+    /// confirm the group matches ours, and feed it to the state holder.
+    /// Returns Ok even on validation failure (we log + drop, no error).
+    pub async fn process_latency_canon_message(&self, data: &[u8]) -> anyhow::Result<()> {
+        let report: savitri_consensus::types::LatencyReport = match serde_json::from_slice(data) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::debug!(error = %e, "LatencyCanon: failed to deserialize report");
+                return Ok(());
+            }
+        };
+        if !report.verify_signature() {
+            tracing::warn!(
+                reporter = %report.reporter,
+                round = report.round,
+                "LatencyCanon: signature verification failed - DROP"
+            );
+            return Ok(());
+        }
+        let local_group = self
+            .group_manager
+            .get_current_group_cached()
+            .map(|g| g.group_id.clone())
+            .unwrap_or_default();
+        if !local_group.is_empty() && report.group_id != local_group {
+            tracing::debug!(
+                report_group = %report.group_id,
+                local_group = %local_group,
+                "LatencyCanon: report for foreign group - DROP"
+            );
+            return Ok(());
+        }
+        if let Some(ref state) = self.latency_canon_state {
+            state.ingest_report(report);
+        } else {
+            tracing::debug!("LatencyCanon: state holder not yet installed - DROP");
+        }
+        Ok(())
+    }
+
+    /// Periodic rebuild + DIAG snapshot. Returns the current canonical
+    /// table size so a periodic logger can publish it. No-op if the
+    /// state holder is not yet installed.
+    pub async fn rebuild_latency_canon_table(&self) -> usize {
+        let Some(ref state) = self.latency_canon_state else {
+            return 0;
+        };
+        let height = self
+            .last_certified_height
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let table = state.rebuild(height);
+        let count = table.defined_pair_count();
+        let buffered = state.buffered_count();
+        tracing::warn!(
+            target: "savitri::diag",
+            window_end = height,
+            defined_pairs = count,
+            buffered_reports = buffered,
+            "DIAG[latency-canon] table rebuilt"
+        );
+        count
+    }
+
     pub async fn determine_proposer(&self) -> Option<String> {
         let latencies = self.member_latencies.read().await;
         let pou_scores = self.member_pou_scores.read().await;

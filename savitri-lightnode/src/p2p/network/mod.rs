@@ -419,6 +419,10 @@ pub async fn start_network(
     )?)?;
     let (intra_publish_tx, mut intra_publish_rx) =
         mpsc::channel::<(libp2p::gossipsub::IdentTopic, Vec<u8>)>(64);
+
+    // V0.2 Phase 1 (Score Canonicity, issue #31): canon publisher needs an independent
+    // clone of the publish sink. The original handle is consumed by the IGC constructor.
+    let intra_publish_tx_clone_for_canon = intra_publish_tx.clone();
     let pou_scoring = shared_pou_score
         .clone()
         .map(|s| Arc::new(crate::availability::PouScoring::with_shared(s)));
@@ -464,6 +468,55 @@ pub async fn start_network(
         .write()
         .await
         .set_observations(Arc::clone(&pou_observations));
+
+    // V0.2 Phase 1 (Score Canonicity, issue #31): create the canonical RTT
+    // state holder, attach it to the IGC, and spawn the periodic publisher
+    // task. The publisher pulls observations from the same ObservationStore
+    // wired above, signs reports, and gossipsub-publishes on the per-group
+    // canon topic every LATENCY_CANON_PUBLISH_INTERVAL_SECS (10s).
+    let latency_canon_state = std::sync::Arc::new(crate::latency_canon_state::LatencyCanonState::new());
+    intra_group_comm
+        .write()
+        .await
+        .set_latency_canon_state(latency_canon_state.clone());
+    {
+        let gm_for_publisher = group_manager.clone();
+        let igc_for_round = intra_group_comm.clone();
+        crate::latency_canon_publisher::spawn_publisher(
+            crate::latency_canon_publisher::LatencyCanonPublisherConfig {
+                local_peer_id: local_node_id.clone(),
+                signing_key: signing_key.clone(),
+                observations: Arc::clone(&pou_observations),
+                network_publish_tx: intra_publish_tx_clone_for_canon.clone(),
+            },
+            move || {
+                let g = gm_for_publisher.get_current_group_cached()?;
+                let height = if let Ok(c) = igc_for_round.try_read() {
+                    c.last_certified_height.load(std::sync::atomic::Ordering::Relaxed)
+                } else {
+                    0
+                };
+                Some((g.group_id, height))
+            },
+        );
+    }
+
+    // V0.2 Phase 1: periodic DIAG snapshot of the canonical table (every 10s).
+    // Operators grep "DIAG[latency-canon]" to see the table converge.
+    {
+        let igc_for_diag = intra_group_comm.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(std::time::Duration::from_secs(10));
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            tick.tick().await;
+            loop {
+                tick.tick().await;
+                let c = igc_for_diag.read().await;
+                let _ = c.rebuild_latency_canon_table().await;
+            }
+        });
+    }
+
 
     // Initialize last_certified_height from persistent storage/DAG at boot so the
     // pipeline starts from the correct height instead of 0 (prevents chain stall after restart).
@@ -2527,6 +2580,24 @@ pub async fn start_network(
                                                 }
                                             }
 
+                                            // V0.2 Phase 1 (Score Canonicity, issue #31) — Latency Canon receive path
+                                            {
+                                                let canon_topic_hash = {
+                                                    let comm = intra_group_comm.read().await;
+                                                    let t = comm.get_latency_canon_topic().await;
+                                                    t.hash()
+                                                };
+                                                if message.topic == canon_topic_hash {
+                                                    let comm = intra_group_comm.clone();
+                                                    let data = message.data.clone();
+                                                    tokio::spawn(async move {
+                                                        let c = comm.read().await;
+                                                        if let Err(e) = c.process_latency_canon_message(&data).await {
+                                                            tracing::warn!(error = ?e, "latency_canon: process failed");
+                                                        }
+                                                    });
+                                                }
+                                            }
                                             // Handle PoU ACK - confirms our PoU share was received by a peer
                                             if message.topic == intra_group_pou_ack_topic.hash() {
                                                 if let Ok(ack) = serde_json::from_slice::<PouScoreAck>(&message.data) {
@@ -4921,6 +4992,8 @@ pub async fn start_network(
                             (intra_group_pong_topic.clone(), "pong"),
                             (intra_group_election_topic.clone(), "election"),
                             (intra_group_latency_topic.clone(), "latency"),
+                            // V0.2 Phase 1 (Score Canonicity, issue #31)
+                            (crate::latency_canon_publisher::topic_for_group(&group_id_str), "latency_canon"),
                             (intra_group_proposal_topic.clone(), "proposal"),
                             (intra_group_vote_topic.clone(), "vote"),
                         ] {
