@@ -50,7 +50,7 @@ impl MonolithPolicy {
 
 use super::block::Block;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MonolithHeader {
     #[serde(with = "serde_big_array::BigArray")]
     pub monolith_id: [u8; 64],

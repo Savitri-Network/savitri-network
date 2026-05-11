@@ -371,7 +371,7 @@ mod tests {
             pou_score: 0.5,
             capabilities: vec!["test".to_string()],
             uptime_percentage: 100.0,
-            account: None,
+            account: [0u8; 32],
         }
     }
 

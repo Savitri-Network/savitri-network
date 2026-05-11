@@ -106,10 +106,13 @@ mod tests {
         // Valid parameters should work
         config.set_mesh_params(12, 3, 6);
 
-        // Invalid parameters should panic
-        std::panic::catch_unwind(|| {
+        // Invalid parameters should panic. `ConfigBuilder` is `!UnwindSafe`
+        // because it holds an interior `&mut`; wrap in `AssertUnwindSafe` —
+        // the value is discarded inside the closure, so propagating panics
+        // back to the test driver is harmless.
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             config.set_mesh_params(12, 7, 6); // outbound_min > mesh_n/2
-        })
+        }))
         .expect_err("Should panic for invalid parameters");
     }
 

@@ -1097,6 +1097,7 @@ mod tests {
                 state_commit: [2; 64],
                 exec_height: 1000,
                 epoch_id: 123,
+                ..Default::default()
             },
             start_height: 900,
             end_height: 1000,

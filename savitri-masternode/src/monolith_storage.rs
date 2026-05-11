@@ -558,6 +558,7 @@ mod tests {
                 state_commit: [2; 64],
                 exec_height: 1000,
                 epoch_id: 123,
+                ..Default::default()
             },
             start_height: 900,
             end_height: 1000,
@@ -600,6 +601,7 @@ mod tests {
                     state_commit: [(i + 1) as u8; 64],
                     exec_height: i,
                     epoch_id: 123,
+                    ..Default::default()
                 },
                 start_height: i - 100,
                 end_height: i,
