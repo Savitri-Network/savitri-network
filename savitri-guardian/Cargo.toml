@@ -73,6 +73,11 @@ default = ["archive", "monitoring"]
 archive = ["rocksdb"]
 monitoring = ["metrics", "metrics-exporter-prometheus", "sysinfo"]
 
+[dev-dependencies]
+# Used by `#[cfg(test)] mod tests` in `archive.rs` for TempDir-backed
+# RocksDB fixtures.
+tempfile = "3"
+
 [[bin]]
 name = "savitri-guardian"
 path = "src/main.rs"
