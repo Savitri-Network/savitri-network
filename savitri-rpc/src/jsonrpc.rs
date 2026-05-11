@@ -1618,6 +1618,10 @@ mod tests {
         fee: Option<u128>,
         data: Option<Vec<u8>>,
         pubkey: Vec<u8>,
+        // `serde` only derives `Serialize` for `[T; N]` up to N=32; the
+        // 64-byte Ed25519 signature needs `serde_big_array::BigArray`,
+        // matching the pattern used by `TestRewardLedgerEntryWire` below.
+        #[serde(with = "serde_big_array::BigArray")]
         sig: [u8; 64],
         pre_verified: bool,
     }

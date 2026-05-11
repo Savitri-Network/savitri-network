@@ -172,6 +172,7 @@ mod tests {
                 .collect(),
             reporter_pubkey: [0u8; 32],
             signature: [0u8; 64],
+            nonce: 0,
         }
     }
 
