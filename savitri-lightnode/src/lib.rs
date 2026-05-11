@@ -13,6 +13,11 @@ pub mod config;
 pub mod integrity;
 #[cfg(feature = "desktop")]
 pub mod latency_service;
+// V0.2 Phase 1 (Score Canonicity, issue #31)
+#[cfg(feature = "desktop")]
+pub mod latency_canon_publisher;
+#[cfg(feature = "desktop")]
+pub mod latency_canon_state;
 #[cfg(feature = "desktop")]
 pub mod logging;
 #[cfg(feature = "desktop")]

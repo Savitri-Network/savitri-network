@@ -23,7 +23,8 @@ use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::types::{
-    DefaultScoreCalculator, IntegrityMeasurement, LatencyMeasurement, LatencyType, ScoreCalculator,
+    bucket_from_rtt_ms, DefaultScoreCalculator, IntegrityMeasurement, LatencyMeasurement,
+    LatencyType, PeerLatencyObservation, ScoreCalculator,
 };
 
 /// Default rolling window for samples, in seconds (1 hour).
@@ -449,6 +450,49 @@ impl ObservationStore {
 
     pub fn window_secs(&self) -> u64 {
         self.window_secs
+    }
+
+    /// V0.2 Phase 1 (Score Canonicity, issue #31): build the set of
+    /// `PeerLatencyObservation` rows for the current observation window,
+    /// ready to be included in a `LatencyReport` and gossipped to peers.
+    ///
+    /// `exclude_self` is the local node's peer_id; the returned vector
+    /// never includes an observation of self.
+    pub fn build_canon_observations(&self, exclude_self: &str) -> Vec<PeerLatencyObservation> {
+        let now = now_secs();
+        let cutoff = now.saturating_sub(self.window_secs);
+        let Ok(map) = self.inner.read() else {
+            return Vec::new();
+        };
+        let mut out: Vec<PeerLatencyObservation> = Vec::with_capacity(map.len());
+        for (peer_id, obs) in map.iter() {
+            if peer_id == exclude_self {
+                continue;
+            }
+            let mut rtts: Vec<u64> = obs
+                .latency
+                .iter()
+                .filter(|s| s.ts_secs >= cutoff)
+                .map(|s| s.rtt_ms)
+                .collect();
+            if rtts.is_empty() {
+                continue;
+            }
+            rtts.sort_unstable();
+            let median_rtt = rtts[(rtts.len() - 1) / 2];
+            let samples = if rtts.len() > u8::MAX as usize {
+                u8::MAX
+            } else {
+                rtts.len() as u8
+            };
+            out.push(PeerLatencyObservation {
+                peer_id: peer_id.clone(),
+                rtt_ms_bucket: bucket_from_rtt_ms(median_rtt),
+                samples,
+            });
+        }
+        out.sort_by(|a, b| a.peer_id.cmp(&b.peer_id));
+        out
     }
 }
 
