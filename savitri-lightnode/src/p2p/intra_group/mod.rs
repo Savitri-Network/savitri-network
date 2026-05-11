@@ -1938,10 +1938,24 @@ impl IntraGroupCommunication {
             self.compute_baseline_pou_score().await
         };
 
-        let our_latency_score = 0.5; // Default for self
-        let our_combined = (our_pou as f64 / 10000.0 * 0.7) + (our_latency_score * 0.3);
-        // V0.2 Phase 1.5 port: cast our_combined to permille at the wire boundary.
-        let our_combined_permille = (our_combined * 1000.0).clamp(0.0, 1000.0) as u32;
+        // V0.2 Phase 1.4c port (Score Canonicity, issue #31): self uses the same
+        // formula as peers. The canonical lookup for our own peer_id usually
+        // returns None (no one reports our RTT to ourselves) — neutral 1000
+        // falls out, matching the legacy 0.5 semantics (max value, no
+        // self-penalty).
+        let our_group_id_for_lookup = self
+            .group_manager
+            .get_current_group_cached()
+            .map(|g| g.group_id)
+            .unwrap_or_default();
+        let our_latency_canon_permille: u32 = match self.latency_canon_state.as_ref() {
+            Some(state) => state.lookup_score(&our_group_id_for_lookup, &self.local_node_id) as u32,
+            None => 1000,
+        };
+        let our_pou_normalized_permille: u32 = (our_pou as u32) / 10;
+        let our_combined_permille: u32 = (our_pou_normalized_permille.saturating_mul(7)
+            + our_latency_canon_permille.saturating_mul(3))
+            / 10;
         candidates.push((self.local_node_id.clone(), our_combined_permille, our_pou as u32));
 
         // Add other members (only current group members with fresh PoU scores)
@@ -1964,18 +1978,30 @@ impl IntraGroupCommunication {
                 );
                 continue;
             }
-            let latency_score = if let Some((latency, _)) = latencies.get(member_id) {
-                // Lower latency = higher score (inverse relationship)
-                1.0 / (1.0 + latency.as_secs_f64())
-            } else {
-                0.5 // Default if no latency measurement
+            // V0.2 Phase 1.4c port (Score Canonicity, issue #31): replace the
+            // per-observer f64 latency_score with a deterministic integer
+            // lookup against the canonical LatencyTable. combined_permille is
+            // computed entirely in u32 — no f64 path remains.
+            //
+            // latency_canon_permille: u32 in [0, 1000], 1000 = fast RTT.
+            // pou_normalized_permille: u32 in [0, 1000] = pou_score / 10.
+            // combined_permille: u32 in [0, 1000] = 70% PoU + 30% latency canon.
+            let group_id_for_lookup = self
+                .group_manager
+                .get_current_group_cached()
+                .map(|g| g.group_id)
+                .unwrap_or_default();
+            let latency_canon_permille: u32 = match self.latency_canon_state.as_ref() {
+                Some(state) => state.lookup_score(&group_id_for_lookup, member_id) as u32,
+                None => 1000, // No table yet (bootstrap) — neutral max.
             };
-
-            let pou_normalized = *pou_score as f64 / 10000.0; // Convert basis points to 0-1
-            let combined_score = (pou_normalized * 0.7) + (latency_score * 0.3); // 70% PoU, 30% latency
-
-            // V0.2 Phase 1.5 port: cast combined_score f64 to permille at the wire boundary.
-            let combined_permille = (combined_score * 1000.0).clamp(0.0, 1000.0) as u32;
+            let pou_normalized_permille: u32 = (*pou_score) / 10;
+            let combined_permille: u32 = (pou_normalized_permille.saturating_mul(7)
+                + latency_canon_permille.saturating_mul(3))
+                / 10;
+            // Silence unused-import warning while the legacy latencies map remains
+            // populated by the GroupPong handler (still wired for diagnostic use).
+            let _ = &latencies;
             candidates.push((member_id.clone(), combined_permille, *pou_score));
         }
 
