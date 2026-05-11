@@ -142,9 +142,11 @@ mod standalone_tests {
         assert!(seconds > 1670000000); // After 2022
         assert!(seconds < 2000000000); // Before 2033
 
-        // Test timestamp relationships
-        assert!(millis > seconds * 1000);
-        assert!(nanos > millis * 1000000);
+        // Test timestamp relationships. `millis`/`nanos` are `u128`,
+        // `seconds`/`millis` on the right-hand side are `u64`; widen
+        // explicitly so the comparison type-checks.
+        assert!(millis > u128::from(seconds) * 1000);
+        assert!(nanos > millis * 1_000_000);
 
         // Test timestamp arithmetic
         let one_hour_later = seconds + 3600;

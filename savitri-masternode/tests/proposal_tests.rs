@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // © 2026 Savitri Network
 
-//! Tests for the proposal system functionality
+//! Tests for the proposal system functionality.
+//!
+//! Requires the `contracts` feature (see `governance_tests.rs` for the same
+//! gating rationale). Run with:
+//!     `cargo test -p savitri-masternode --features contracts`
+#![cfg(feature = "contracts")]
 
 use savitri_contracts::governance::proposals::{
     Proposal, ProposalAction, ProposalStatus, ProposalSystem,
