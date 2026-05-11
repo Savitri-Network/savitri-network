@@ -312,7 +312,7 @@ pub struct ElectionCertificate {
     pub elected_proposer_pubkey: [u8; 32],
     pub proposer_pou_score: u32,
     pub timestamp: u64,
-    pub candidates: Vec<(String, u32, f64)>,
+    pub candidates: Vec<(String, u32, u32)>,
     pub attestations: Vec<ElectionAttestation>,
     /// First chain height at which this certificate is valid (bound for replay protection).
     /// Default 0 keeps wire-format backward compatibility with peers running pre-Falla3 code.
@@ -341,7 +341,7 @@ pub struct ProposerElectionCertMessage {
     pub proposer_pubkey: [u8; 32],
     pub proposer_pou_score: u32,
     pub election_timestamp: u64,
-    pub candidates: Vec<(String, u32, f64)>,
+    pub candidates: Vec<(String, u32, u32)>,
     pub attestations: Vec<ElectionAttestation>,
 }
 
@@ -812,7 +812,7 @@ pub struct ProposerElectionResult {
     /// Election timestamp
     pub timestamp: u64,
     /// All candidates and their scores
-    pub candidates: Vec<(String, u32, f64)>, // (node_id, pou_score, combined_score)
+    pub candidates: Vec<(String, u32, u32)>, // (node_id, pou_score, combined_score)
     /// First chain height at which the elected proposer's tenure starts.
     /// Bound into the signed payload (Falla 3 anti-replay): a certificate built from these
     /// results is only valid for [tenure_start_height, tenure_start_height + TENURE_BLOCKS).
@@ -1827,7 +1827,11 @@ impl IntraGroupCommunication {
         let latencies = self.member_latencies.read().await;
         let pou_scores = self.member_pou_scores.read().await;
 
-        let mut candidates: Vec<(String, f64, u32)> = Vec::new(); // (node_id, combined_score, pou_score)
+        // V0.2 Phase 1.5 port: combined_score is now u32 permille (0..1000),
+        // not f64. The conversion from local f64 to permille happens at the wire
+        // boundary inside this function (see candidates.push call). Phase 1.4c
+        // (canonical lookup against LatencyCanonState) is NOT ported here yet.
+        let mut candidates: Vec<(String, u32, u32)> = Vec::new(); // (node_id, combined_permille, pou_score)
 
         // Include ourselves
         let our_pou = if let Some(ref pou_scoring) = self.pou_scoring {
@@ -1840,7 +1844,9 @@ impl IntraGroupCommunication {
 
         let our_latency_score = 0.5; // Default for self
         let our_combined = (our_pou as f64 / 10000.0 * 0.7) + (our_latency_score * 0.3);
-        candidates.push((self.local_node_id.clone(), our_combined, our_pou as u32));
+        // V0.2 Phase 1.5 port: cast our_combined to permille at the wire boundary.
+        let our_combined_permille = (our_combined * 1000.0).clamp(0.0, 1000.0) as u32;
+        candidates.push((self.local_node_id.clone(), our_combined_permille, our_pou as u32));
 
         // Add other members (only current group members with fresh PoU scores)
         let current_group_members = self.group_manager.get_group_members().await;
@@ -1872,7 +1878,9 @@ impl IntraGroupCommunication {
             let pou_normalized = *pou_score as f64 / 10000.0; // Convert basis points to 0-1
             let combined_score = (pou_normalized * 0.7) + (latency_score * 0.3); // 70% PoU, 30% latency
 
-            candidates.push((member_id.clone(), combined_score, *pou_score));
+            // V0.2 Phase 1.5 port: cast combined_score f64 to permille at the wire boundary.
+            let combined_permille = (combined_score * 1000.0).clamp(0.0, 1000.0) as u32;
+            candidates.push((member_id.clone(), combined_permille, *pou_score));
         }
 
         // Sort by integer PoU score (deterministic across all nodes).
@@ -2218,7 +2226,8 @@ impl IntraGroupCommunication {
         let group_id_for_msg = group_id.clone();
 
         // Convert candidates to expected format
-        let candidates_data: Vec<(String, u32, f64)> = candidates
+        // V0.2 Phase 1.5 port: type Vec<(String, u32, u32)> = (id, pou_score, combined_permille)
+        let candidates_data: Vec<(String, u32, u32)> = candidates
             .iter()
             .map(|(id, combined_score, pou_score)| (id.clone(), *pou_score, *combined_score))
             .collect();

@@ -133,7 +133,7 @@ pub struct ElectionCertificate {
     pub elected_proposer_pubkey: [u8; 32],
     pub proposer_pou_score: u32,
     pub timestamp: u64,
-    pub candidates: Vec<(String, u32, f64)>,
+    pub candidates: Vec<(String, u32, u32)>,
     pub attestations: Vec<ElectionAttestation>,
     /// First chain height at which this certificate is valid (Falla 3 anti-replay binding).
     /// `serde(default)` keeps deserialization compatible with older peers that haven't

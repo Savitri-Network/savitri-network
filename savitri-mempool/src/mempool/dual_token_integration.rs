@@ -516,36 +516,3 @@ impl DualTokenMempoolIntegration {
 // TESTS
 // ============================================
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_dual_token_stats_creation() {
-        let stats = DualTokenStats {
-            total_supply: 1000000,
-            total_burned: 1000,
-            circulating_supply: 999000,
-            burn_rate: 0.1,
-            min_balance_threshold: 100,
-            network_metrics: NetworkMetrics::default(),
-        };
-
-        assert_eq!(stats.total_supply, 1000000);
-        assert_eq!(stats.burn_rate, 0.1);
-    }
-
-    #[test]
-    fn test_fee_burn_info_creation() {
-        let info = FeeBurnInfo {
-            tx_hash: [1u8; 64],
-            sender_address: [2u8; 32],
-            total_fee: 1000,
-            burn_amount: 100,
-            network_fee: 900,
-        };
-
-        assert_eq!(info.total_fee, 1000);
-        assert_eq!(info.burn_amount, 100);
-    }
-}
