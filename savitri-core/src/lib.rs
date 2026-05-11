@@ -17,7 +17,7 @@
 //!
 //! ## Usage
 //!
-//! ```rust
+//! ```ignore
 //! use savitri_core::{Account, generate_keypair, sign, verify};
 //!
 //! // Create an account

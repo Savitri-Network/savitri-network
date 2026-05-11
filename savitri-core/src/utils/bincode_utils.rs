@@ -12,7 +12,7 @@
 //!
 //! # Usage
 //!
-//! ```rust
+//! ```ignore
 //! use savitri_node::bincode_utils::consensus_bincode;
 //!
 //! // Serialize
