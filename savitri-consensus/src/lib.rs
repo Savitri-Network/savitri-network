@@ -25,6 +25,8 @@ pub mod slashing; // Misbehavior tracking, jailing, and permanent removal
 pub mod traits;
 pub mod types;
 pub mod validation; // Make validation public // Canonical consensus primitives (epoch, hashing, quorum) — Tier 1 refactor
+                    // V0.2 Phase 2 (Lattice ordering, issue #32 follow-up to #31)
+pub mod lattice;
 
 // Re-export DAG types for convenience
 pub use dag::{BranchInfo, Conflict, ConflictDetector, DAGConfig, DAGManager};

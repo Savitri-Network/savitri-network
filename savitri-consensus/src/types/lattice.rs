@@ -82,7 +82,7 @@ pub type BatchRoot = [u8; 32];
 /// Other group members verify the signature, then attest by signing the
 /// same payload with their own keys — the collected attestations form a
 /// [`CellCertificate`].
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LatticeCell {
     /// Lattice round at which this cell was authored.
     pub round: LatticeRound,
@@ -187,7 +187,7 @@ impl LatticeCell {
 /// One attestation on a cell. A group member signs the cell's
 /// `signable_bytes()` with their own key, asserting the cell is well-
 /// formed and the parent set is acceptable.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CellAttestation {
     /// Signer's stable peer_id.
     pub signer: String,
@@ -201,7 +201,7 @@ pub struct CellAttestation {
 /// A certified lattice cell. Carries the original cell plus the set of
 /// attestations that meet BFT 2f+1 quorum. Once a cell is certified, it
 /// is admissible as a parent of subsequent-round cells.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CellCertificate {
     /// The cell being certified.
     pub cell: LatticeCell,
@@ -236,7 +236,7 @@ impl CellCertificate {
 /// reachable from the pivot cell via the `parents` relation is appended
 /// to the canonical ordered stream, in deterministic topological order
 /// (round-major, then author lexicographic tiebreak).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Cycle {
     /// Cycle index `k`. Anchor round is `2 * k`, follow round is `2 * k + 1`.
     pub index: CycleIndex,
