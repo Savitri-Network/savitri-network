@@ -22,6 +22,8 @@ anyhow = "1.0"
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+# V0.2 Phase 1 (Score Canonicity): for [u8; 64] serialization in LatencyReport.signature
+serde-big-array = "0.5"
 bincode = "=1.3.3"
 blake3 = "=1.5.5"
 tokio = { version = "1.0", features = ["sync", "rt", "time"] }
