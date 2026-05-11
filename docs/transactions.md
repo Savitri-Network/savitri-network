@@ -231,3 +231,14 @@ healthy cluster.
   smart-contract execution and the on-chain fee distribution.
 - [`savitri-sdk/README.md`](../savitri-sdk/README.md) — client-side
   API reference and code examples.
+
+---
+
+## Related crates
+
+- [`savitri-mempool`](../savitri-mempool/README.md) - transaction
+  prevalidation, admission rules, and pending transaction storage.
+- [`savitri-rpc`](../savitri-rpc/README.md) - JSON-RPC methods for
+  transaction submission and receipt polling.
+- [`savitri-sdk`](../savitri-sdk/README.md) - client APIs for building,
+  signing, and broadcasting transactions.
