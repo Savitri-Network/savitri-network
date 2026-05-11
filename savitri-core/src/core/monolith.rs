@@ -50,7 +50,9 @@ impl MonolithPolicy {
 
 use super::block::Block;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+// `Default` is implemented manually below because Rust's std only derives
+// `Default` for `[T; N]` up to N=32, and several fields here are `[u8; 64]`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MonolithHeader {
     #[serde(with = "serde_big_array::BigArray")]
     pub monolith_id: [u8; 64],
@@ -91,6 +93,30 @@ pub struct MonolithHeader {
     /// Optional ZKP proof binding headers_commit and state_commit with cryptographic verification.
     #[serde(default)]
     pub zkp_proof: Option<ZkProof>,
+}
+
+impl Default for MonolithHeader {
+    fn default() -> Self {
+        Self {
+            monolith_id: [0u8; 64],
+            prev_monolith_id: [0u8; 64],
+            headers_commit: [0u8; 64],
+            state_commit: [0u8; 64],
+            proof_commit: [0u8; 64],
+            exec_height: 0,
+            window_start: 0,
+            epoch_id: 0,
+            produced_at_ms: 0,
+            producer: [0u8; 32],
+            cosignatures: Vec::new(),
+            merkle_proof: None,
+            aggregate_receipt: None,
+            generation_time_ms: 0,
+            size_bytes: 0,
+            serve_count: 0,
+            zkp_proof: None,
+        }
+    }
 }
 
 impl MonolithHeader {
