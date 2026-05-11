@@ -372,6 +372,10 @@ mod tests {
 
         assert_eq!(cert.voter_count(), 3);
         assert!(cert.is_valid());
-        assert_eq!(cert.voter_signatures, voter_sigs);
+        // `ConsensusCertificate::new` hex-encodes the raw [u8; 64] signatures
+        // into `Vec<String>` internally. Recreate the same encoding on the
+        // input side to compare like with like.
+        let voter_sigs_hex: Vec<String> = voter_sigs.iter().map(hex::encode).collect();
+        assert_eq!(cert.voter_signatures, voter_sigs_hex);
     }
 }

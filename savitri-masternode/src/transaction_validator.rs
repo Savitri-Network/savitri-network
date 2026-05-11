@@ -505,7 +505,11 @@ mod tests {
     #[test]
     fn test_transaction_validation_all_unique() {
         let mut validator = TransactionValidator::new();
-        let transactions = create_test_transactions(5);
+        // `create_test_transactions` lives in another `#[cfg(test)] mod tests`
+        // and isn't accessible from here. Build the batch locally from the
+        // existing single-tx helper.
+        let transactions: Vec<ValidatedTransaction> =
+            (1u32..=5).map(create_test_transaction).collect();
 
         let result = validator.validate_block_transactions(transactions, "group1".to_string());
 
