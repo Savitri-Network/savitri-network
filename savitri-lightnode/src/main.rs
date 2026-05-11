@@ -1647,6 +1647,13 @@ async fn run_main() -> Result<()> {
     tokio::pin!(shutdown_signal);
     let mut shutdown_requested = false;
 
+    // The peer-server runtime is opt-in and is not wired up in this
+    // open-source release. Keep the `Option` slot so the existing
+    // `peer_server_task.take()` shutdown calls remain valid no-ops.
+    // Future work: spawn `crate::peer_server::spawn(runtime)` here
+    // when `resolved_peer_server.peer_server.enabled` is true.
+    let mut peer_server_task: Option<crate::peer_server::PeerServerTaskHandle> = None;
+
     if tx_handle.is_none()
         && block_handle.is_none()
         && router_handle.is_none()

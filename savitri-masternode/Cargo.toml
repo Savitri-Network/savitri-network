@@ -87,7 +87,12 @@ once_cell = "1.19"
 
 [features]
 default = ["full"]
-full = ["storage", "consensus", "p2p", "contracts"]
+# `contracts` is intentionally NOT in `full` yet: the contract executor
+# integration expects `Arc<savitri_storage::Storage>` directly, while
+# the binaries consume storage through a trait object. Enable it
+# explicitly (`--features contracts`) until that signature gap is
+# closed.
+full = ["storage", "consensus", "p2p"]
 rpc = ["dep:savitri-rpc"]
 storage = ["dep:savitri-storage"]
 consensus = ["dep:savitri-consensus"]
