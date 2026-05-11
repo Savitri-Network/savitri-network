@@ -492,13 +492,16 @@ pub async fn start_network(
             },
             move || {
                 let g = gm_for_publisher.get_current_group_cached()?;
-                let height = if let Ok(c) = igc_for_round.try_read() {
-                    c.last_certified_height
-                        .load(std::sync::atomic::Ordering::Relaxed)
-                } else {
-                    0
-                };
-                Some((g.group_id, height))
+                // V0.2 Phase 2 (latency table convergence): use a wall-clock
+                // aligned bucket as the `round` field on the report instead
+                // of last_certified_height. All LNs sharing a synced clock
+                // land in the same bucket, so the aggregator window filter
+                // produces a byte-identical canonical table across observers.
+                // The legacy `last_certified_height` based round broke
+                // determinism because chain head lag varies per-observer.
+                let _ = &igc_for_round; // retained for future per-group counters
+                let bucket = crate::latency_canon_publisher::current_wall_clock_bucket();
+                Some((g.group_id, bucket))
             },
         );
     }

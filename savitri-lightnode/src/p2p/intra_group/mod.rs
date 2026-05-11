@@ -1899,19 +1899,24 @@ impl IntraGroupCommunication {
     /// Periodic rebuild + DIAG snapshot. Returns the current canonical
     /// table size so a periodic logger can publish it. No-op if the
     /// state holder is not yet installed.
+    ///
+    /// V0.2 Phase 2 (latency table convergence): `window_end` is now the
+    /// current wall-clock-aligned bucket (not chain height). All LNs
+    /// rebuild against the SAME bucket index, so the canonical table is
+    /// byte-identical cluster-wide. Pre-Phase-2 the window was per-LN
+    /// chain head, which lagged differently per-observer and broke
+    /// candidates determinism.
     pub async fn rebuild_latency_canon_table(&self) -> usize {
         let Some(ref state) = self.latency_canon_state else {
             return 0;
         };
-        let height = self
-            .last_certified_height
-            .load(std::sync::atomic::Ordering::Relaxed);
-        let table = state.rebuild(height);
+        let bucket = crate::latency_canon_publisher::current_wall_clock_bucket();
+        let table = state.rebuild(bucket);
         let count = table.defined_pair_count();
         let buffered = state.buffered_count();
         tracing::warn!(
             target: "savitri::diag",
-            window_end = height,
+            window_end = bucket,
             defined_pairs = count,
             buffered_reports = buffered,
             "DIAG[latency-canon] table rebuilt"

@@ -44,6 +44,29 @@ pub const LATENCY_CANON_TOPIC_SUFFIX: &str = "/latency_canon/1";
 /// (one ≤500 byte message per LN every 10s).
 pub const LATENCY_CANON_PUBLISH_INTERVAL_SECS: u64 = 10;
 
+/// V0.2 Phase 2 (latency table convergence): the `round` field on
+/// `LatencyReport` carries a wall-clock-aligned bucket index, NOT chain
+/// height. All LNs sharing a synchronized clock land in the same bucket
+/// for each publication tick, so the aggregator's window filter accepts
+/// the same set of reports across all observers — making the canonical
+/// table byte-identical cluster-wide. Window size of 3 buckets gives ~30s
+/// tolerance for NTP drift / network jitter.
+///
+/// Bucket size MUST equal `LATENCY_CANON_PUBLISH_INTERVAL_SECS` so each
+/// publication tick increments the bucket by exactly 1.
+pub const WALL_CLOCK_BUCKET_SECS: u64 = LATENCY_CANON_PUBLISH_INTERVAL_SECS;
+
+/// Compute the current wall-clock-aligned bucket. Used as `round` in
+/// `LatencyReport`. Same formula across publisher and aggregator → same
+/// canonical table.
+#[inline]
+pub fn current_wall_clock_bucket() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() / WALL_CLOCK_BUCKET_SECS)
+        .unwrap_or(0)
+}
+
 /// Build the canonical gossip topic name for a given group_id.
 pub fn topic_for_group(group_id: &str) -> IdentTopic {
     IdentTopic::new(format!(

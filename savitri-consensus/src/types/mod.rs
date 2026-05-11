@@ -12,6 +12,8 @@ pub mod validation;
 // V0.2 Phase 1 (Score Canonicity, issue #31)
 pub mod latency_canon;
 pub mod latency_table;
+// V0.2 Phase 2 spike (Lattice ordering, follow-up to #31)
+pub mod lattice;
 
 // Re-export all types
 pub use block::*;
@@ -25,3 +27,8 @@ pub use latency_canon::{
     bucket_from_rtt_ms, LatencyReport, PeerLatencyObservation, RTT_BUCKET_MAX, RTT_BUCKET_MS,
 };
 pub use latency_table::{LatencyTable, MIN_REPORTERS, MIN_SAMPLES, WINDOW_SIZE};
+// V0.2 Phase 2 spike — re-export lattice primitives for cross-crate use.
+pub use lattice::{
+    lattice_quorum, BatchRoot, CellAttestation, CellCertificate, CellId, Cycle, CycleIndex,
+    LatticeCell, LatticeRound, LATTICE_ROUND_DURATION_SECS,
+};
