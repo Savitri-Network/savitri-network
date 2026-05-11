@@ -453,6 +453,7 @@ pub fn default_verifier() -> Box<dyn ZkVerifier> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ZkpConfig;
 
     #[test]
     fn test_factory_creates_mock_verifier() {
