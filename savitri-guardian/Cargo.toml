@@ -9,6 +9,10 @@ homepage = "https://savitrinetwork.com"
 repository = "https://github.com/savitri-network/savitri-guardian"
 keywords = ["blockchain", "archive", "backup", "guardian", "savitri"]
 categories = ["blockchain"]
+# Examples under `examples/` import `savitri_guardian::*` but this crate is
+# binary-only (no `lib.rs`), so they don't compile. Keep them as tutorial
+# code but skip cargo's auto-discovery, matching `Savitri-contracts`.
+autoexamples = false
 
 [dependencies]
 # Core dependencies - PUBLISHED VERSIONS
