@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Zero Knowledge Proof implementation
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ZkProof {
     pub proof: Vec<u8>,
     pub public_inputs: Vec<u8>,
@@ -11,7 +11,7 @@ pub struct ZkProof {
 }
 
 /// ZKP Statement/Claim
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Statement {
     pub a: [u8; 32],
     pub b: [u8; 32],

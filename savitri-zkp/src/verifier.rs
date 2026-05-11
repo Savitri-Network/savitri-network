@@ -453,6 +453,11 @@ pub fn default_verifier() -> Box<dyn ZkVerifier> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // `ZkpConfig` and `ZkpBackend` live at the crate root, not in
+    // `verifier::`; the wildcard above only brings in `verifier`
+    // symbols. Pull them in explicitly so the tests can construct
+    // configs without going through `super::ZkpConfig`.
+    use crate::{ZkpBackend, ZkpConfig};
 
     #[test]
     fn test_factory_creates_mock_verifier() {
