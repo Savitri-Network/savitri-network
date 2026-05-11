@@ -105,8 +105,9 @@ impl LatencyReport {
         // Domain separation: "savitri-latency-canon-v1|" prefix prevents
         // signature replay across protocol versions or other Savitri
         // signing contexts.
-        let mut out = Vec::with_capacity(64 + self.group_id.len() + self.reporter.len()
-            + self.observations.len() * 32);
+        let mut out = Vec::with_capacity(
+            64 + self.group_id.len() + self.reporter.len() + self.observations.len() * 32,
+        );
         out.extend_from_slice(b"savitri-latency-canon-v1|");
         out.extend_from_slice(&self.round.to_le_bytes());
         out.push(b'|');

@@ -83,9 +83,8 @@ where
     F: FnMut() -> Option<(String, u64)> + Send + 'static,
 {
     tokio::spawn(async move {
-        let mut tick = tokio::time::interval(Duration::from_secs(
-            LATENCY_CANON_PUBLISH_INTERVAL_SECS,
-        ));
+        let mut tick =
+            tokio::time::interval(Duration::from_secs(LATENCY_CANON_PUBLISH_INTERVAL_SECS));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Skip the immediate first tick — let the observation window
         // accumulate at least a few samples before publishing the first

@@ -107,9 +107,7 @@ impl LatencyCanonState {
         let Ok(g) = self.inner.read() else {
             return None;
         };
-        g.cached
-            .as_ref()
-            .and_then(|t| t.lookup(group_id, peer_id))
+        g.cached.as_ref().and_then(|t| t.lookup(group_id, peer_id))
     }
 
     /// Read the cached table (if any). Primarily for diagnostics.
@@ -180,18 +178,8 @@ mod tests {
     #[test]
     fn ingest_and_rebuild_produces_canonical_table() {
         let state = LatencyCanonState::new();
-        state.ingest_report(make_report(
-            10,
-            "g",
-            "ln-1",
-            vec![("ln-A", 8, 5)],
-        ));
-        state.ingest_report(make_report(
-            10,
-            "g",
-            "ln-2",
-            vec![("ln-A", 12, 5)],
-        ));
+        state.ingest_report(make_report(10, "g", "ln-1", vec![("ln-A", 8, 5)]));
+        state.ingest_report(make_report(10, "g", "ln-2", vec![("ln-A", 12, 5)]));
         let t = state.rebuild(10);
         assert_eq!(t.lookup("g", "ln-A"), Some(8)); // lower median of [8,12]
     }
@@ -238,12 +226,7 @@ mod tests {
             "ln-1",
             vec![("ln-A", 0, 5)], // bucket 0 → score 1000
         ));
-        state.ingest_report(make_report(
-            10,
-            "g",
-            "ln-2",
-            vec![("ln-A", 0, 5)],
-        ));
+        state.ingest_report(make_report(10, "g", "ln-2", vec![("ln-A", 0, 5)]));
         state.rebuild(10);
         assert_eq!(state.lookup_score("g", "ln-A"), 1000);
     }
