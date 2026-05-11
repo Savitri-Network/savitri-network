@@ -1956,7 +1956,11 @@ impl IntraGroupCommunication {
         let our_combined_permille: u32 = (our_pou_normalized_permille.saturating_mul(7)
             + our_latency_canon_permille.saturating_mul(3))
             / 10;
-        candidates.push((self.local_node_id.clone(), our_combined_permille, our_pou as u32));
+        candidates.push((
+            self.local_node_id.clone(),
+            our_combined_permille,
+            our_pou as u32,
+        ));
 
         // Add other members (only current group members with fresh PoU scores)
         let current_group_members = self.group_manager.get_group_members().await;
@@ -2341,17 +2345,18 @@ impl IntraGroupCommunication {
     /// Broadcast election result to group members
     async fn broadcast_election_result(
         &self,
-        candidates: &[(String, f64, u32)],
+        candidates: &[(String, u32, u32)],
         elected_proposer: &str,
     ) -> Result<()> {
         let group_id = self.get_current_group_id().await;
         let group_id_for_msg = group_id.clone();
 
-        // Convert candidates to expected format
-        // V0.2 Phase 1.5 port: type Vec<(String, u32, u32)> = (id, pou_score, combined_permille)
+        // V0.2 Phase 1.5 port: local candidates tuple is (id, combined_permille, pou_score).
+        // The wire field carries (id, pou_score, combined_permille) so we reorder here.
+        // All u32 — no f64 path remains.
         let candidates_data: Vec<(String, u32, u32)> = candidates
             .iter()
-            .map(|(id, combined_score, pou_score)| (id.clone(), *pou_score, *combined_score))
+            .map(|(id, combined_permille, pou_score)| (id.clone(), *pou_score, *combined_permille))
             .collect();
 
         let elected_pou_score = candidates

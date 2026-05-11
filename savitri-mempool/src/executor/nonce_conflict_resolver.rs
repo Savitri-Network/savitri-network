@@ -359,4 +359,3 @@ impl ConflictAnalysis {
         self.total_conflicts > 0 && (self.max_conflict_size > 2 || self.avg_conflict_size > 1.5)
     }
 }
-

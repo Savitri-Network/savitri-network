@@ -336,4 +336,3 @@ impl FinalityTracker {
         self.receipts.iter().find(|r| r.tx_hash == tx_hash)
     }
 }
-

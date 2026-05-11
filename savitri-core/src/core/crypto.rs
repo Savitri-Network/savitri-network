@@ -298,4 +298,3 @@ pub fn peer_id_from_public_key_bytes(pubkey_bytes: &[u8]) -> anyhow::Result<Stri
     let hash = Sha256::digest(pubkey_bytes);
     Ok(format!("12D3KooW{}", hex::encode(&hash[..20])))
 }
-

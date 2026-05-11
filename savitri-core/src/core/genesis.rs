@@ -777,4 +777,3 @@ pub fn get_genesis_metadata(storage: &Storage) -> Result<Option<GenesisMetadata>
 pub fn is_genesis_initialized(storage: &Storage) -> Result<bool> {
     Ok(genesis_block_exists(storage)? && get_genesis_metadata(storage)?.is_some())
 }
-

@@ -474,7 +474,8 @@ pub async fn start_network(
     // task. The publisher pulls observations from the same ObservationStore
     // wired above, signs reports, and gossipsub-publishes on the per-group
     // canon topic every LATENCY_CANON_PUBLISH_INTERVAL_SECS (10s).
-    let latency_canon_state = std::sync::Arc::new(crate::latency_canon_state::LatencyCanonState::new());
+    let latency_canon_state =
+        std::sync::Arc::new(crate::latency_canon_state::LatencyCanonState::new());
     intra_group_comm
         .write()
         .await
@@ -492,7 +493,8 @@ pub async fn start_network(
             move || {
                 let g = gm_for_publisher.get_current_group_cached()?;
                 let height = if let Ok(c) = igc_for_round.try_read() {
-                    c.last_certified_height.load(std::sync::atomic::Ordering::Relaxed)
+                    c.last_certified_height
+                        .load(std::sync::atomic::Ordering::Relaxed)
                 } else {
                     0
                 };
@@ -516,7 +518,6 @@ pub async fn start_network(
             }
         });
     }
-
 
     // Initialize last_certified_height from persistent storage/DAG at boot so the
     // pipeline starts from the correct height instead of 0 (prevents chain stall after restart).

@@ -516,4 +516,3 @@ fn extract_zkp_proof_from_certificate(
     // For now, return None to trigger fallback
     None
 }
-

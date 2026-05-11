@@ -578,4 +578,3 @@ impl Default for ValidatorStats {
         }
     }
 }
-

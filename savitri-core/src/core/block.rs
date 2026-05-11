@@ -339,4 +339,3 @@ impl BlockSummary {
         }
     }
 }
-

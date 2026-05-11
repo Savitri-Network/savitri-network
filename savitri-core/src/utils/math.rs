@@ -258,4 +258,3 @@ pub mod financial {
         present_value * (1.0 + rate).powf(periods as f64)
     }
 }
-

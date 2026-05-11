@@ -166,4 +166,3 @@ fn compute_canonical_bucket(group_reports: &[&LatencyReport], target: &str) -> O
     let idx = (buckets.len() - 1) / 2;
     Some(buckets[idx])
 }
-

@@ -1319,4 +1319,3 @@ impl HybridMempoolPipeline {
         transfer_guard.metrics().clone()
     }
 }
-
