@@ -663,4 +663,3 @@ impl Default for NetworkManager {
         Self::new(NetworkConfig::default()).unwrap()
     }
 }
-
