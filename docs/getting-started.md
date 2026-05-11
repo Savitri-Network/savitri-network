@@ -52,7 +52,8 @@ If you only want to play with the lightnode and you don't care about
 persistent storage, you can build with the in-memory backend:
 
 ```bash
-cargo build --release -p savitri-lightnode --no-default-features --features desktop
+cargo build --release -p savitri-lightnode \
+    --no-default-features --features desktop,rpc
 ```
 
 ---

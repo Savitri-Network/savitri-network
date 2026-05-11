@@ -134,7 +134,8 @@ cargo build --release -p savitri-guardian
 Lightnode without persistent storage (in-memory backend):
 
 ```bash
-cargo build --release -p savitri-lightnode --no-default-features --features desktop
+cargo build --release -p savitri-lightnode \
+    --no-default-features --features desktop,rpc
 ```
 
 ---

@@ -275,9 +275,14 @@ pub fn libp2p_keypair_to_identity(keypair: libp2p::identity::Keypair) -> Identit
     // to a fresh local identity, matching the prior behaviour.
     match keypair.try_into_ed25519() {
         Ok(ed25519_keypair) => {
-            let secret_slice: &[u8] = ed25519_keypair.secret().as_ref();
+            // Bind the SecretKey to a `let` so its lifetime spans the
+            // `as_ref().try_into()` chain. libp2p-identity 0.2 returns
+            // the secret by value, so without the binding the
+            // temporary is dropped before we can borrow its bytes.
+            let secret = ed25519_keypair.secret();
             // Invariant: ed25519 SecretKey is always 32 bytes.
-            let secret_bytes: [u8; 32] = secret_slice
+            let secret_bytes: [u8; 32] = secret
+                .as_ref()
                 .try_into()
                 .expect("invariant: ed25519 secret key is 32 bytes");
             let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_bytes);

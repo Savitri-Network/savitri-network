@@ -100,7 +100,13 @@ metrics-exporter-prometheus = { version = "0.18", optional = true, default-featu
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp"] }
 
 [features]
-default = ["desktop", "rocksdb"]
+# `rpc` is part of the default feature set because the public JSON-RPC
+# API is the primary integration surface for a lightnode; several
+# modules (`tx_router`, the proposer-cache wiring) are written
+# expecting `savitri-rpc` types to be present. Building without rpc is
+# possible via `--no-default-features --features desktop,rocksdb` but
+# is mostly useful for narrow edge-node scenarios.
+default = ["desktop", "rocksdb", "rpc"]
 # RocksDB (persistent storage) - requires MSVC on Windows. Omit with --no-default-features.
 rocksdb = ["savitri-storage/rocksdb"]
 mobile = ["lightweight-p2p"]
