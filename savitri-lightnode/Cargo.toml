@@ -11,6 +11,11 @@ homepage = "https://savitrinetwork.com"
 repository = "https://github.com/savitri-network/savitri-lightnode"
 keywords = ["blockchain", "node", "light", "mobile", "savitri"]
 categories = ["blockchain"]
+# Examples under `examples/` import `savitri_lightnode::load_config` and
+# similar binary-private symbols. Disable auto-discovery and keep the
+# files only as tutorial scaffolding, matching the masternode / guardian
+# crates.
+autoexamples = false
 
 [dependencies]
 # Core dependencies - LOCAL PATH FOR TESTING

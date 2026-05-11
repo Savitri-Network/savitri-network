@@ -10,6 +10,11 @@ repository = "https://github.com/savitri-network/savitri-masternode"
 keywords = ["blockchain", "node", "validator", "masternode", "savitri"]
 categories = ["blockchain"]
 default-run = "savitri-masternode"
+# Examples under `examples/` import `savitri_masternode::load_config` and
+# similar symbols that live in `main.rs` (not exposed via `lib.rs`). They
+# are kept as tutorial scaffolding but skipped by cargo auto-discovery,
+# matching `Savitri-contracts` and `savitri-guardian`.
+autoexamples = false
 
 [dependencies]
 # Core dependencies - LOCAL PATH FOR TESTING
