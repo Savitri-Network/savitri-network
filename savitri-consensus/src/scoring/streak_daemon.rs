@@ -164,10 +164,3 @@ pub fn default_epoch_provider() -> Arc<dyn Fn() -> u64 + Send + Sync> {
             .unwrap_or(0)
     })
 }
-
-#[cfg(test)]
-mod tests {
-    // The real daemon spins a tokio task. We test only `run_one_pass`
-    // here because it is sync to invoke and deterministic.
-    // Integration coverage lives in `tests/scoring_observations.rs`.
-}

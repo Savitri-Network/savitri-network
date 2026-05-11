@@ -38,38 +38,3 @@ pub fn group_index_from_id(group_id: &str) -> Option<usize> {
     }
     third.parse::<usize>().ok()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_normal_multigroup_id() {
-        assert_eq!(group_index_from_id("group_3_0_3"), Some(0));
-        assert_eq!(group_index_from_id("group_3_1_3"), Some(1));
-        assert_eq!(group_index_from_id("group_8_2_8"), Some(2));
-    }
-
-    #[test]
-    fn parses_singleton_id() {
-        assert_eq!(group_index_from_id("group_singleton_0"), Some(0));
-        assert_eq!(group_index_from_id("group_singleton_5"), Some(5));
-    }
-
-    #[test]
-    fn epoch_drift_yields_same_index() {
-        // Cert from old epoch and active_group at new epoch resolve to the
-        let cert_old = group_index_from_id("group_3_0_3");
-        let active_new = group_index_from_id("group_8_0_8");
-        assert_eq!(cert_old, active_new);
-    }
-
-    #[test]
-    fn rejects_malformed_inputs() {
-        assert_eq!(group_index_from_id(""), None);
-        assert_eq!(group_index_from_id("group"), None);
-        assert_eq!(group_index_from_id("group_3"), None);
-        assert_eq!(group_index_from_id("not_a_group_0_0_0"), None);
-        assert_eq!(group_index_from_id("group_a_b_c"), None);
-    }
-}

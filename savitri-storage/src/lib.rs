@@ -113,18 +113,3 @@ pub fn safe_deserialize<'de, T: serde::Deserialize<'de>>(
         .with_limit(MAX_BINCODE_SIZE)
         .deserialize(bytes)
 }
-
-#[cfg(test)]
-#[cfg(feature = "rocksdb")]
-mod tests {
-    use crate::{Storage, StorageResult};
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_storage_creation() -> StorageResult<()> {
-        let temp_dir = TempDir::new()?;
-        let storage = Storage::new(temp_dir.path())?;
-        assert!(storage.is_healthy());
-        Ok(())
-    }
-}

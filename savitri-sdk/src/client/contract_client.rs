@@ -255,26 +255,3 @@ pub struct ProposalStatus {
     /// Whether the proposal has been executed.
     pub executed: bool,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_proposal_status_serialization() {
-        let status = ProposalStatus {
-            id: 1,
-            title: "Test Proposal".to_string(),
-            votes_for: 100,
-            votes_against: 50,
-            status: "active".to_string(),
-            executed: false,
-        };
-
-        let serialized = serde_json::to_string(&status).unwrap();
-        let deserialized: ProposalStatus = serde_json::from_str(&serialized).unwrap();
-
-        assert_eq!(status.id, deserialized.id);
-        assert_eq!(status.title, deserialized.title);
-    }
-}

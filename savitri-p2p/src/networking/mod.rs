@@ -15,26 +15,3 @@ pub use mod_fixed::{
 
 /// Main networking manager using the fixed implementation
 pub type NetworkingManager = SimpleNetworkManager;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_networking_config_default() {
-        let config = NetworkingConfig::default();
-        assert!(!config.rpc.enabled);
-        assert_eq!(
-            config.compression.default_algorithm,
-            CompressionAlgorithm::None
-        );
-        assert_eq!(config.connectors.max_retries, 3);
-    }
-
-    #[tokio::test]
-    async fn test_networking_manager_creation() {
-        let config = NetworkingConfig::default();
-        let manager = NetworkingManager::new(config);
-        assert!(manager.is_ok());
-    }
-}

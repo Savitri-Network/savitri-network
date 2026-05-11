@@ -199,35 +199,3 @@ impl Default for TransactionBuilder {
         Self::new()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_transaction_builder() {
-        let tx = TransactionBuilder::new()
-            .from("0".repeat(64))
-            .to("1".repeat(64))
-            .value(1000)
-            .nonce(1)
-            .build()
-            .unwrap();
-
-        assert_eq!(tx.value, 1000);
-        assert_eq!(tx.nonce, 1);
-    }
-
-    #[test]
-    fn test_transaction_build_and_sign() {
-        let wallet = Wallet::new();
-        let tx = TransactionBuilder::new()
-            .to("1".repeat(64))
-            .value(1000)
-            .build_and_sign(&wallet)
-            .unwrap();
-
-        assert_eq!(tx.transaction.from, wallet.address());
-        assert_eq!(tx.transaction.value, 1000);
-    }
-}

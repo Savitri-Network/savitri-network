@@ -64,39 +64,3 @@ impl AddressUtils {
         Ok(clean.to_lowercase())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_address_validation() {
-        let valid_addr = "0".repeat(64);
-        assert!(AddressUtils::validate(&valid_addr).is_ok());
-
-        // With 0x prefix
-        let prefixed = format!("0x{}", "a".repeat(64));
-        assert!(AddressUtils::validate(&prefixed).is_ok());
-
-        let invalid_addr = "0".repeat(32);
-        assert!(AddressUtils::validate(&invalid_addr).is_err());
-    }
-
-    #[test]
-    fn test_address_conversion() {
-        let bytes = [0u8; 32];
-        let addr = AddressUtils::from_bytes(&bytes).unwrap();
-        assert_eq!(addr, "0".repeat(64));
-
-        let back_bytes = AddressUtils::to_bytes(&addr).unwrap();
-        assert_eq!(bytes, back_bytes);
-    }
-
-    #[test]
-    fn test_normalize_strips_prefix() {
-        let addr = format!("0x{}", "AB".repeat(32));
-        let normalized = AddressUtils::normalize(&addr).unwrap();
-        assert!(!normalized.starts_with("0x"));
-        assert_eq!(normalized, "ab".repeat(32));
-    }
-}

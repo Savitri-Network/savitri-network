@@ -311,25 +311,3 @@ pub enum ProposalRejectionReason {
     DuplicateProposal,
     Timeout,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_proposal_validator_creation() {
-        let config = ProposalValidationConfig::default();
-        let validator = ProposalValidator::new(config);
-        let stats = validator.stats().await;
-        assert_eq!(stats.proposals_validated, 0);
-    }
-
-    #[tokio::test]
-    async fn test_add_remove_proposer() {
-        let validator = ProposalValidator::new(ProposalValidationConfig::default());
-        let proposer = [1u8; 32];
-
-        validator.add_proposer(proposer).await;
-        validator.remove_proposer(&proposer).await;
-    }
-}

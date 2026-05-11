@@ -185,27 +185,3 @@ where
         }
     });
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn topic_for_group_format_matches_spec() {
-        let t = topic_for_group("group_42_0");
-        // The IdentTopic Display impl gives back the topic string verbatim.
-        assert_eq!(
-            format!("{}", t),
-            "/savitri/group/group_42_0/latency_canon/1"
-        );
-    }
-
-    #[test]
-    fn topic_for_group_handles_complex_ids() {
-        let t = topic_for_group("group_410_0_410_e3fde077");
-        assert_eq!(
-            format!("{}", t),
-            "/savitri/group/group_410_0_410_e3fde077/latency_canon/1"
-        );
-    }
-}

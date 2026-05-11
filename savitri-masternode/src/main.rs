@@ -38,9 +38,8 @@ fn save_peer_id_to_file(peer_id: libp2p::PeerId, port: u16) -> Result<()> {
 
 #[cfg(feature = "zkp-all")]
 mod zkp_integration;
-#[cfg(feature = "zkp-all")]
-#[cfg(test)]
-mod zkp_tests;
+// zkp_tests mod removed: file only contained legacy tests against a
+// vanished API; mass-truncation left it empty. See git history.
 #[cfg(test)]
 mod monolith_test {
     use savitri_masternode::bridge::core::slot_scheduler::{SlotScheduler, SlotSchedulerConfig};
