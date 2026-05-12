@@ -174,3 +174,14 @@ signing rules, and fee model.
   open contribution opportunities.
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) — branching, commit style,
   review process.
+
+---
+
+## Related crates
+
+- [`savitri-masternode`](../savitri-masternode/README.md) - BFT
+  finalisation, group certificates, and masternode operation.
+- [`savitri-lightnode`](../savitri-lightnode/README.md) - local block
+  production and lightnode runtime behaviour.
+- [`savitri-sdk`](../savitri-sdk/README.md) - client-side helpers for
+  submitting transactions and querying a node.

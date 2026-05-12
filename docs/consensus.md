@@ -220,3 +220,12 @@ certificate independently and use it as a finality proof.
 The roadmap items that touch consensus directly are tracked under
 the `phase: research` label and the `Phase 3 — Research & Scaling`
 milestone (see [`ROADMAP.md`](../ROADMAP.md)).
+
+---
+
+## Related crates
+
+- [`savitri-consensus`](../savitri-consensus/README.md) - core
+  consensus types and validation logic.
+- [`savitri-masternode`](../savitri-masternode/README.md) - masternode
+  runtime for BFT voting and certificate publication.

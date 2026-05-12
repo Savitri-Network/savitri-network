@@ -193,3 +193,12 @@ The intent is that the steady state is "boring" — groups are stable,
 proposers rotate quietly through their tenures, certificates flow
 back into the masternode set, and the chain advances at the
 configured cadence.
+
+---
+
+## Related crates
+
+- [`savitri-consensus`](../savitri-consensus/README.md) - group
+  membership, election, and certificate data structures.
+- [`savitri-lightnode`](../savitri-lightnode/README.md) - lightnode
+  participation in group formation and proposer rotation.
