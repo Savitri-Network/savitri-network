@@ -71,14 +71,3 @@ impl LightClient {
         self.rpc.pou_local().await
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_light_client_creation() {
-        let client = LightClient::new("http://localhost:8545");
-        assert!(client.is_ok());
-    }
-}

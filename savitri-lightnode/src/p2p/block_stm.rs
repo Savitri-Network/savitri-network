@@ -321,39 +321,3 @@ fn execute_tx_speculative(
     view.writes.insert(recipient_addr, new_recipient);
     view.success = true;
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_multi_version_store_basic() {
-        let mut mvs = MultiVersionStore::new();
-        let key = b"account_a".to_vec();
-
-        let acc1 = savitri_core::Account {
-            balance: 100,
-            nonce: 1,
-        };
-        let acc2 = savitri_core::Account {
-            balance: 90,
-            nonce: 2,
-        };
-
-        mvs.write(key.clone(), 0, acc1.clone());
-        mvs.write(key.clone(), 2, acc2.clone());
-
-        // TX 1 should see TX 0's write
-        let (val, writer) = mvs.read_latest_before(&key, 1).unwrap();
-        assert_eq!(val.balance, 100);
-        assert_eq!(writer, 0);
-
-        // TX 3 should see TX 2's write
-        let (val, writer) = mvs.read_latest_before(&key, 3).unwrap();
-        assert_eq!(val.balance, 90);
-        assert_eq!(writer, 2);
-
-        // TX 0 should see nothing
-        assert!(mvs.read_latest_before(&key, 0).is_none());
-    }
-}

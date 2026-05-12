@@ -337,6 +337,39 @@ The `LatencyTable` and `latency_score` introduced in Phase 1 are reused at cell-
 
 Under Phase 2, there is no `BlockCertificate` broadcast on a gossipsub topic between MN and LN. The cycle commit happens at the masternode aggregating cell certificates it already has in hand; the LN learns the commit through the next cycle's cell observations (which reference the committed lineage). Blocker (3) is structurally eliminated.
 
+### 4.7 Spike implementation (in tree)
+
+A type-level spike of the Lattice primitives ships alongside this design document. The module `savitri-consensus/src/types/lattice.rs` defines the wire-format types and basic helpers:
+
+- `LatencyRound` / `CycleIndex` / `CellId` / `BatchRoot` — stable identifier types.
+- `LatticeCell { round, group_id, author, author_pubkey, parents, batch_root, author_signature }` — one vertex in the DAG. The constructor `with_sorted_parents` enforces canonical parent ordering so `signable_bytes()` is byte-identical across observers.
+- `LatticeCell::signable_bytes()` — domain-separated `b"savitri-lattice-cell-v1|..."` payload. Verifies via `verify_author_signature()`.
+- `LatticeCell::cell_id()` — blake3 over `signable_bytes()` for stable referencing in parent sets.
+- `CellAttestation { signer, signer_pubkey, signature }` — one BFT attestation on a cell. Future work can swap this for a BLS aggregate signature without breaking the API surface.
+- `CellCertificate { cell, attestations }` — a cell with `2f+1` attestations attached. Admissible as a parent of subsequent-round cells.
+- `Cycle { index, group_id, pivot, pivot_cell, committed_cells }` — one cycle commit decision. Helpers: `anchor_round()`, `follow_round()`, `did_commit()`.
+- `lattice_quorum(group_size)` — canonical PBFT-style `2f+1` threshold: `f = (n - 1) / 3`, `quorum = 2f + 1`. Aligned with the existing `savitri_consensus::primitives::quorum::quorum_for_voters`.
+
+Test coverage shipped with the spike:
+
+- `quorum_classic_pbft_values` — sanity check on the PBFT formula at n ∈ {0, 1, 3, 4, 5, 6, 7, 10}.
+- `parents_sorted_after_with_sorted_parents` — canonical parent ordering enforced.
+- `signable_bytes_observer_independent` — same input → same bytes.
+- `cell_id_deterministic` — same cell → same id across observers.
+- `signable_bytes_change_with_any_field` — sensitivity to round, group_id, batch_root.
+- `signature_round_trip` — Ed25519 sign/verify, plus tamper detection.
+- `cycle_helpers` — anchor_round / follow_round / did_commit return correct derived values.
+
+Aggregation rules (cell certificate quorum collection, lineage commit, cycle pivot election from the PoU-weighted RR schedule) live alongside the existing consensus protocols and will be wired in a follow-up issue. This spike module compiles standalone — no existing code path is altered.
+
+### 4.8 Convergence prerequisite — Phase 2 latency table
+
+Phase 1.5's `candidates` field exclusion from `signable_bytes` had a single root cause: per-observer `last_certified_height` divergence drove the `LatencyCanonState` window filter to admit different report sets on each LN, producing different canonical tables.
+
+Phase 2 lands a fix orthogonal to the Lattice spike: the `round` field on `LatencyReport` is now derived from a wall-clock-aligned 10-second bucket (`unix_secs / 10`), not from the local chain head. The publisher and the aggregator share the same `current_wall_clock_bucket()` helper. As long as participating LNs run with their clocks loosely synchronized via NTP — a standard testnet operational assumption — the bucket index is identical cluster-wide.
+
+With the table now byte-canonical, re-inclusion of `candidates` and `proposer_pou_score` in `signable_bytes` becomes a follow-up cleanup commit. The wire format type change (`Vec<(String, u32, u32)>`) introduced in Phase 1.5 already accommodates the integer-only payload.
+
 ---
 
 ## 5. Migration plan

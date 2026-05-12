@@ -21,8 +21,6 @@ use tokio::sync::RwLock;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
-///
 /// ```ignore
 /// use savitri_consensus::traits::ConsensusEngine;
 /// use savitri_consensus::protocols::GroupAwareConsensus;

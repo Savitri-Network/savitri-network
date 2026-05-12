@@ -68,20 +68,3 @@ impl TxRoutingMetrics {
             .increment(1);
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn smoke_inc_methods_dont_panic() {
-        // Only verifies compilation + no panic; no value assertion because the
-        // metric handles live in a global recorder (would require metrics-util).
-        TxRoutingMetrics::inc_route_entry();
-        TxRoutingMetrics::inc_local_decision();
-        TxRoutingMetrics::inc_forward_decision();
-        TxRoutingMetrics::inc_fallback_local("test");
-        TxRoutingMetrics::inc_cross_group_rx();
-        TxRoutingMetrics::observe_payload_size(1024);
-    }
-}

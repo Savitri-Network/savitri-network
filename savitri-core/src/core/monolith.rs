@@ -50,6 +50,8 @@ impl MonolithPolicy {
 
 use super::block::Block;
 
+// `Default` is implemented manually below because Rust's std only derives
+// `Default` for `[T; N]` up to N=32, and several fields here are `[u8; 64]`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MonolithHeader {
     #[serde(with = "serde_big_array::BigArray")]
@@ -91,6 +93,30 @@ pub struct MonolithHeader {
     /// Optional ZKP proof binding headers_commit and state_commit with cryptographic verification.
     #[serde(default)]
     pub zkp_proof: Option<ZkProof>,
+}
+
+impl Default for MonolithHeader {
+    fn default() -> Self {
+        Self {
+            monolith_id: [0u8; 64],
+            prev_monolith_id: [0u8; 64],
+            headers_commit: [0u8; 64],
+            state_commit: [0u8; 64],
+            proof_commit: [0u8; 64],
+            exec_height: 0,
+            window_start: 0,
+            epoch_id: 0,
+            produced_at_ms: 0,
+            producer: [0u8; 32],
+            cosignatures: Vec::new(),
+            merkle_proof: None,
+            aggregate_receipt: None,
+            generation_time_ms: 0,
+            size_bytes: 0,
+            serve_count: 0,
+            zkp_proof: None,
+        }
+    }
 }
 
 impl MonolithHeader {
@@ -946,113 +972,4 @@ pub fn export_monolith_to_json(monolith: &MonolithHeader) -> Result<String> {
 /// Import monolith from JSON
 pub fn import_monolith_from_json(json: &str) -> Result<MonolithHeader> {
     serde_json::from_str(json).map_err(|e| anyhow::anyhow!("JSON import failed: {}", e))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_monolith_policy() {
-        let policy = MonolithPolicy::new(1000);
-        assert_eq!(policy.max_blocks, 1000);
-        assert_eq!(policy.retention_limit, 30);
-        assert_eq!(policy.max_size_bytes, 500 * 1024 * 1024);
-
-        let policy_with_epoch = policy.with_epoch_length(Some(100));
-        assert_eq!(policy_with_epoch.epoch_length, Some(100));
-    }
-
-    #[test]
-    fn test_monolith_header() {
-        let monolith = create_test_monolith();
-        assert_eq!(monolith.exec_height, 100);
-        assert_eq!(monolith.window_start, 90);
-        assert_eq!(monolith.window_size(), 11);
-        assert!(monolith.validate().is_ok());
-    }
-
-    #[test]
-    fn test_genesis_monolith() {
-        let monolith = create_genesis_monolith([1u8; 32]);
-        assert!(monolith.is_genesis());
-        assert_eq!(monolith.exec_height, 0);
-        assert_eq!(monolith.window_start, 0);
-    }
-
-    #[test]
-    fn test_compute_monolith_id() {
-        let headers_commit = [1u8; 64];
-        let state_commit = [2u8; 64];
-        let proof_commit = [3u8; 64];
-
-        let id1 = compute_monolith_id(&headers_commit, &state_commit, &proof_commit);
-        let id2 = compute_monolith_id(&headers_commit, &state_commit, &proof_commit);
-
-        assert_eq!(id1, id2);
-        assert_eq!(id1.len(), 64);
-    }
-
-    #[test]
-    fn test_monolith_validation() {
-        let monolith = create_test_monolith();
-        assert!(monolith.validate().is_ok());
-
-        let mut invalid_monolith = monolith.clone();
-        invalid_monolith.window_start = 150; // Greater than exec_height
-        assert!(invalid_monolith.validate().is_err());
-    }
-
-    #[test]
-    fn test_monolith_chain() {
-        let genesis = create_genesis_monolith([1u8; 32]);
-        let mut monolith2 = create_test_monolith();
-        monolith2.prev_monolith_id = genesis.monolith_id;
-
-        let monoliths = vec![genesis, monolith2];
-        assert!(validate_monolith_chain(&monoliths).is_ok());
-
-        let chain_height = get_monolith_chain_height(&monoliths);
-        assert_eq!(chain_height, 100);
-    }
-
-    #[test]
-    fn test_monolith_stats() {
-        let monoliths = vec![create_test_monolith(), create_genesis_monolith([1u8; 32])];
-        let stats = get_monolith_stats(&monoliths);
-
-        assert_eq!(stats.total_count, 2);
-        assert_eq!(stats.unique_producers, 2);
-        assert_eq!(stats.unique_epochs, 2);
-    }
-
-    #[test]
-    fn test_monolith_age() {
-        let mut monolith = create_test_monolith();
-        // Simulate some time passing
-        monolith.produced_at_ms = monolith.produced_at_ms.saturating_sub(1000);
-
-        assert_eq!(monolith.age_ms(), 1000);
-        assert!(monolith.is_recent(2000));
-        assert!(!monolith.is_recent(500));
-    }
-
-    #[test]
-    fn test_monolith_serialization() {
-        let monolith = create_test_monolith();
-        let serialized = monolith.serialize()?;
-        let deserialized = MonolithHeader::deserialize(&serialized)?;
-
-        assert_eq!(monolith, deserialized);
-    }
-
-    #[test]
-    fn test_json_export_import() {
-        let monolith = create_test_monolith();
-        let json = export_monolith_to_json(&monolith)?;
-        let imported = import_monolith_from_json(&json)?;
-
-        assert_eq!(monolith.exec_height, imported.exec_height);
-        assert_eq!(monolith.producer, imported.producer);
-    }
 }

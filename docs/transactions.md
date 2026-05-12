@@ -48,7 +48,7 @@ serialisation order:
 |---|---|---|
 | `from` | `String` (32-byte address, hex) | Sender address |
 | `to` | `String` (32-byte address, hex) | Recipient address (or contract) |
-| `amount` | `u64` | Native-token amount in base units (1 SAVI = 10^18 wei) |
+| `amount` | `u64` | Native-token amount in base units (1 SAVT = 10^18 wei) |
 | `nonce` | `u64` | Sender-local counter, monotonically increasing |
 | `fee` | `u64` | Optional fee in base units; `0` is permitted only when the network is configured for a fee-free testnet |
 | `data` | `Vec<u8>` | Optional payload (for contract calls / arbitrary data) |

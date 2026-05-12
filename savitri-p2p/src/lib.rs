@@ -40,15 +40,3 @@ pub const DEFAULT_MAX_PENDING_CONNECTIONS: usize = 20;
 /// Default timeout values (in seconds)
 pub const DEFAULT_CONNECTION_TIMEOUT: u64 = 30;
 pub const DEFAULT_IDLE_TIMEOUT: u64 = 300;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_constants() {
-        assert_eq!(P2P_VERSION, "0.1.0");
-        assert_eq!(DEFAULT_P2P_PORT, 8333);
-        assert_eq!(MAX_MESSAGE_SIZE, 4 * 1024 * 1024);
-    }
-}

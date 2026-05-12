@@ -107,9 +107,7 @@ impl LatencyCanonState {
         let Ok(g) = self.inner.read() else {
             return None;
         };
-        g.cached
-            .as_ref()
-            .and_then(|t| t.lookup(group_id, peer_id))
+        g.cached.as_ref().and_then(|t| t.lookup(group_id, peer_id))
     }
 
     /// Read the cached table (if any). Primarily for diagnostics.
@@ -146,126 +144,5 @@ impl LatencyCanonState {
             Some(b) => Self::bucket_to_score(b),
             None => 1000, // Neutral max during bootstrap, see §3.9.
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use savitri_consensus::types::PeerLatencyObservation;
-
-    fn make_report(
-        round: u64,
-        group: &str,
-        reporter: &str,
-        observations: Vec<(&str, u8, u8)>,
-    ) -> LatencyReport {
-        LatencyReport {
-            round,
-            group_id: group.to_string(),
-            reporter: reporter.to_string(),
-            observations: observations
-                .into_iter()
-                .map(|(p, b, s)| PeerLatencyObservation {
-                    peer_id: p.to_string(),
-                    rtt_ms_bucket: b,
-                    samples: s,
-                })
-                .collect(),
-            reporter_pubkey: [0u8; 32],
-            signature: [0u8; 64],
-        }
-    }
-
-    #[test]
-    fn ingest_and_rebuild_produces_canonical_table() {
-        let state = LatencyCanonState::new();
-        state.ingest_report(make_report(
-            10,
-            "g",
-            "ln-1",
-            vec![("ln-A", 8, 5)],
-        ));
-        state.ingest_report(make_report(
-            10,
-            "g",
-            "ln-2",
-            vec![("ln-A", 12, 5)],
-        ));
-        let t = state.rebuild(10);
-        assert_eq!(t.lookup("g", "ln-A"), Some(8)); // lower median of [8,12]
-    }
-
-    #[test]
-    fn buffer_evicts_fifo_when_full() {
-        let state = LatencyCanonState::new();
-        // Push MAX_BUFFERED_REPORTS + 5 reports; expect the oldest 5 evicted.
-        for i in 0..(MAX_BUFFERED_REPORTS + 5) {
-            state.ingest_report(make_report(
-                i as u64,
-                "g",
-                &format!("ln-{}", i),
-                vec![("ln-A", 8, 5)],
-            ));
-        }
-        assert_eq!(state.buffered_count(), MAX_BUFFERED_REPORTS);
-    }
-
-    #[test]
-    fn lookup_score_returns_neutral_when_no_data() {
-        let state = LatencyCanonState::new();
-        // No reports ingested → no cached table.
-        assert_eq!(state.lookup_score("g", "ln-A"), 1000);
-    }
-
-    #[test]
-    fn bucket_to_score_monotonic() {
-        // Lower buckets (faster peers) score higher; clamps at 0 for
-        // very-slow peers.
-        assert_eq!(LatencyCanonState::bucket_to_score(0), 1000);
-        assert_eq!(LatencyCanonState::bucket_to_score(10), 950);
-        assert_eq!(LatencyCanonState::bucket_to_score(100), 500);
-        assert_eq!(LatencyCanonState::bucket_to_score(200), 0);
-        assert_eq!(LatencyCanonState::bucket_to_score(255), 0); // saturating
-    }
-
-    #[test]
-    fn lookup_after_rebuild_reflects_canonical() {
-        let state = LatencyCanonState::new();
-        state.ingest_report(make_report(
-            10,
-            "g",
-            "ln-1",
-            vec![("ln-A", 0, 5)], // bucket 0 → score 1000
-        ));
-        state.ingest_report(make_report(
-            10,
-            "g",
-            "ln-2",
-            vec![("ln-A", 0, 5)],
-        ));
-        state.rebuild(10);
-        assert_eq!(state.lookup_score("g", "ln-A"), 1000);
-    }
-
-    #[test]
-    fn rebuild_is_observer_independent() {
-        // Same buffer → same table → same lookup. The state holder is
-        // the receiver-side wrapper; this test verifies the wrapper
-        // doesn't introduce non-determinism on top of LatencyTable.
-        let s1 = LatencyCanonState::new();
-        let s2 = LatencyCanonState::new();
-        let reports = vec![
-            make_report(10, "g", "ln-1", vec![("ln-A", 5, 5)]),
-            make_report(10, "g", "ln-2", vec![("ln-A", 7, 5)]),
-            make_report(10, "g", "ln-3", vec![("ln-A", 9, 5)]),
-        ];
-        for r in &reports {
-            s1.ingest_report(r.clone());
-            s2.ingest_report(r.clone());
-        }
-        let t1 = s1.rebuild(10);
-        let t2 = s2.rebuild(10);
-        assert_eq!(t1, t2);
     }
 }

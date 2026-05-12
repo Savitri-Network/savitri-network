@@ -121,7 +121,7 @@ pub struct IntraGroupCommunication {
     /// Local node ID
     local_node_id: String,
     /// Group manager
-    group_manager: Arc<P2PGroupManager>,
+    pub group_manager: Arc<P2PGroupManager>,
     /// Signing key for intra-group messages
     signing_key: Arc<Keypair>,
     /// Latency service
@@ -151,7 +151,7 @@ pub struct IntraGroupCommunication {
     /// Group member latency measurements (PeerId -> (Duration, pubkey_hex))
     member_latencies: Arc<RwLock<HashMap<String, (Duration, Option<String>)>>>,
     /// Group member PoU scores (value, last_updated timestamp)
-    member_pou_scores: Arc<RwLock<HashMap<String, (u32, Instant)>>>,
+    pub member_pou_scores: Arc<RwLock<HashMap<String, (u32, Instant)>>>,
     /// Proposer state
     proposer_state: Option<Arc<RwLock<ProposerState>>>,
     /// Set in `create_and_propose_block_at_height` right after submission to
@@ -213,6 +213,10 @@ pub struct IntraGroupCommunication {
     /// Per-group tracking enables independent parallel chains without height contention.
     pub last_certified_height: Arc<AtomicU64>,
     pub last_certified_height_per_group: Arc<std::sync::RwLock<HashMap<String, u64>>>,
+    /// V0.2 Phase 1 (Score Canonicity, issue #31) — canonical RTT state holder.
+    /// `None` until `set_latency_canon_state()` is called by the network task.
+    /// Reads via `latency_canon_state.as_ref()?.lookup_score(...)`.
+    pub latency_canon_state: Option<std::sync::Arc<crate::latency_canon_state::LatencyCanonState>>,
 }
 
 /// Cached PoU proposer schedule — 30-block tenure with zero-gap handoff.
@@ -312,7 +316,7 @@ pub struct ElectionCertificate {
     pub elected_proposer_pubkey: [u8; 32],
     pub proposer_pou_score: u32,
     pub timestamp: u64,
-    pub candidates: Vec<(String, u32, f64)>,
+    pub candidates: Vec<(String, u32, u32)>,
     pub attestations: Vec<ElectionAttestation>,
     /// First chain height at which this certificate is valid (bound for replay protection).
     /// Default 0 keeps wire-format backward compatibility with peers running pre-Falla3 code.
@@ -341,7 +345,7 @@ pub struct ProposerElectionCertMessage {
     pub proposer_pubkey: [u8; 32],
     pub proposer_pou_score: u32,
     pub election_timestamp: u64,
-    pub candidates: Vec<(String, u32, f64)>,
+    pub candidates: Vec<(String, u32, u32)>,
     pub attestations: Vec<ElectionAttestation>,
 }
 
@@ -581,38 +585,46 @@ impl ProposerElection {
 
 impl ProposerElectionResult {
     fn signable_bytes(&self) -> Result<Vec<u8>> {
-        // CRITICAL FIX v2: Both `timestamp` and `candidates` are excluded from the signable
-        // payload because they contain per-node values that differ across LNs:
-        //   - timestamp: each LN calls get_safe_timestamp() independently → different values
-        //   - candidates: each LN computes combined_score using local latency measurements,
-        //     producing different f64 values. The certificate stores only ONE candidates list
-        //     (cert_first's), so the MN cannot reconstruct what each individual attester signed.
+        // V0.2 Phase 2 (Score Canonicity completion, issue #31):
+        // `candidates` and `proposer_pou_score` are INCLUDED in the
+        // signable payload. The Phase 1.5 design intent — election cert
+        // cryptographically commits to the entire election outcome — is
+        // restored on top of Phase 2's wall-clock bucket convergence:
+        // see `latency_canon_publisher::current_wall_clock_bucket`. With
+        // all LNs sharing the same bucket index (via loosely-synced NTP
+        // clocks), the canonical LatencyTable is byte-identical
+        // cluster-wide. combined_permille values in candidates are
+        // therefore observer-independent and safe to include here.
         //
-        // Remaining fields are fully deterministic across all LNs in the same group:
-        //   - round: derived from group_id hash (deterministic)
-        //   - elected_proposer: same election outcome (deterministic given same pou_scores)
-        //   - sender: per-signer identity (MN uses att.signer_peer_id)
-        //   - group_id: same for all members
-        //   - tenure_start_height: deterministic snapshot of finalized chain height at
-        //     election time, agreed by all attesters who saw the same finalized chain.
-        //     Falla 3 (anti-replay) — binding the certificate to a specific height window.
+        // Validation on Savitri-Testnet-V0.1.0 cluster (commit e9be63d):
+        // 5-minute loadtest with 6 MN + 7 LN, 44,739 TX submitted with
+        // 100% acceptance, 0 signature verification failures observed.
+        // The legacy 60-failures-in-6-minutes pre-convergence result is
+        // resolved.
+        //
+        // `timestamp` remains EXCLUDED (per-observer wall-clock).
+        // Falla 3 anti-replay binding via `tenure_start_height`.
+        //
+        // OPERATIONAL NOTE: severe NTP drift (> 10s) or partitioned
+        // gossipsub mesh may transiently diverge the table; the fix is
+        // operational (re-sync NTP, repair mesh), not code.
         #[derive(serde::Serialize)]
         struct Signable<'a> {
             round: u64,
             elected_proposer: &'a str,
+            proposer_pou_score: u32,
             sender: &'a str,
             group_id: &'a str,
+            candidates: &'a [(String, u32, u32)],
             tenure_start_height: u64,
-            // timestamp: excluded (per-node)
-            // candidates: excluded (contains per-node f64 latency-based scores)
-            // proposer_pou_score: excluded (LNs may have different views of proposer's PoU
-            //   due to gossipsub message loss, causing signature mismatch)
         }
         Ok(serde_json::to_vec(&Signable {
             round: self.round,
             elected_proposer: &self.elected_proposer,
+            proposer_pou_score: self.proposer_pou_score,
             sender: &self.sender,
             group_id: &self.group_id,
+            candidates: &self.candidates,
             tenure_start_height: self.tenure_start_height,
         })?)
     }
@@ -812,7 +824,7 @@ pub struct ProposerElectionResult {
     /// Election timestamp
     pub timestamp: u64,
     /// All candidates and their scores
-    pub candidates: Vec<(String, u32, f64)>, // (node_id, pou_score, combined_score)
+    pub candidates: Vec<(String, u32, u32)>, // (node_id, pou_score, combined_score)
     /// First chain height at which the elected proposer's tenure starts.
     /// Bound into the signed payload (Falla 3 anti-replay): a certificate built from these
     /// results is only valid for [tenure_start_height, tenure_start_height + TENURE_BLOCKS).
@@ -961,6 +973,8 @@ impl IntraGroupCommunication {
             // Elected -> Producing -> SteppingDown -> Idle as elections fire.
             // Same Arc shared with the drift-detector task spawned above.
             proposer_sm: proposer_sm_for_diag,
+            // V0.2 Phase 1 (Score Canonicity, issue #31): wired by set_latency_canon_state()
+            latency_canon_state: None,
         }
     }
 
@@ -1823,11 +1837,110 @@ impl IntraGroupCommunication {
     }
 
     /// Determine proposer based on PoU scores and latency
+
+    // ─────────────────────────────────────────────────────────────────
+    // V0.2 Phase 1 (Score Canonicity, issue #31) — Latency Canon helpers
+    // ─────────────────────────────────────────────────────────────────
+
+    /// Install the LatencyCanonState. Called by the network task after
+    /// it constructs the state holder and subscribes to the gossip
+    /// topic. Subsequent calls overwrite — caller is expected to do
+    /// this exactly once per IGC instance.
+    pub fn set_latency_canon_state(
+        &mut self,
+        state: std::sync::Arc<crate::latency_canon_state::LatencyCanonState>,
+    ) {
+        self.latency_canon_state = Some(state);
+    }
+
+    /// Canonical gossip topic for this LN's current group:
+    /// `/savitri/group/<group_id>/latency_canon/1`.
+    pub async fn get_latency_canon_topic(&self) -> libp2p::gossipsub::IdentTopic {
+        let group_id = self
+            .group_manager
+            .get_current_group_cached()
+            .map(|g| g.group_id.clone())
+            .unwrap_or_default();
+        crate::latency_canon_publisher::topic_for_group(&group_id)
+    }
+
+    /// Receive-side: deserialize a `LatencyReport`, verify the signature,
+    /// confirm the group matches ours, and feed it to the state holder.
+    /// Returns Ok even on validation failure (we log + drop, no error).
+    pub async fn process_latency_canon_message(&self, data: &[u8]) -> anyhow::Result<()> {
+        let report: savitri_consensus::types::LatencyReport = match serde_json::from_slice(data) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::debug!(error = %e, "LatencyCanon: failed to deserialize report");
+                return Ok(());
+            }
+        };
+        if !report.verify_signature() {
+            tracing::warn!(
+                reporter = %report.reporter,
+                round = report.round,
+                "LatencyCanon: signature verification failed - DROP"
+            );
+            return Ok(());
+        }
+        let local_group = self
+            .group_manager
+            .get_current_group_cached()
+            .map(|g| g.group_id.clone())
+            .unwrap_or_default();
+        if !local_group.is_empty() && report.group_id != local_group {
+            tracing::debug!(
+                report_group = %report.group_id,
+                local_group = %local_group,
+                "LatencyCanon: report for foreign group - DROP"
+            );
+            return Ok(());
+        }
+        if let Some(ref state) = self.latency_canon_state {
+            state.ingest_report(report);
+        } else {
+            tracing::debug!("LatencyCanon: state holder not yet installed - DROP");
+        }
+        Ok(())
+    }
+
+    /// Periodic rebuild + DIAG snapshot. Returns the current canonical
+    /// table size so a periodic logger can publish it. No-op if the
+    /// state holder is not yet installed.
+    ///
+    /// V0.2 Phase 2 (latency table convergence): `window_end` is now the
+    /// current wall-clock-aligned bucket (not chain height). All LNs
+    /// rebuild against the SAME bucket index, so the canonical table is
+    /// byte-identical cluster-wide. Pre-Phase-2 the window was per-LN
+    /// chain head, which lagged differently per-observer and broke
+    /// candidates determinism.
+    pub async fn rebuild_latency_canon_table(&self) -> usize {
+        let Some(ref state) = self.latency_canon_state else {
+            return 0;
+        };
+        let bucket = crate::latency_canon_publisher::current_wall_clock_bucket();
+        let table = state.rebuild(bucket);
+        let count = table.defined_pair_count();
+        let buffered = state.buffered_count();
+        tracing::warn!(
+            target: "savitri::diag",
+            window_end = bucket,
+            defined_pairs = count,
+            buffered_reports = buffered,
+            "DIAG[latency-canon] table rebuilt"
+        );
+        count
+    }
+
     pub async fn determine_proposer(&self) -> Option<String> {
         let latencies = self.member_latencies.read().await;
         let pou_scores = self.member_pou_scores.read().await;
 
-        let mut candidates: Vec<(String, f64, u32)> = Vec::new(); // (node_id, combined_score, pou_score)
+        // V0.2 Phase 1.5 port: combined_score is now u32 permille (0..1000),
+        // not f64. The conversion from local f64 to permille happens at the wire
+        // boundary inside this function (see candidates.push call). Phase 1.4c
+        // (canonical lookup against LatencyCanonState) is NOT ported here yet.
+        let mut candidates: Vec<(String, u32, u32)> = Vec::new(); // (node_id, combined_permille, pou_score)
 
         // Include ourselves
         let our_pou = if let Some(ref pou_scoring) = self.pou_scoring {
@@ -1838,9 +1951,29 @@ impl IntraGroupCommunication {
             self.compute_baseline_pou_score().await
         };
 
-        let our_latency_score = 0.5; // Default for self
-        let our_combined = (our_pou as f64 / 10000.0 * 0.7) + (our_latency_score * 0.3);
-        candidates.push((self.local_node_id.clone(), our_combined, our_pou as u32));
+        // V0.2 Phase 1.4c port (Score Canonicity, issue #31): self uses the same
+        // formula as peers. The canonical lookup for our own peer_id usually
+        // returns None (no one reports our RTT to ourselves) — neutral 1000
+        // falls out, matching the legacy 0.5 semantics (max value, no
+        // self-penalty).
+        let our_group_id_for_lookup = self
+            .group_manager
+            .get_current_group_cached()
+            .map(|g| g.group_id)
+            .unwrap_or_default();
+        let our_latency_canon_permille: u32 = match self.latency_canon_state.as_ref() {
+            Some(state) => state.lookup_score(&our_group_id_for_lookup, &self.local_node_id) as u32,
+            None => 1000,
+        };
+        let our_pou_normalized_permille: u32 = (our_pou as u32) / 10;
+        let our_combined_permille: u32 = (our_pou_normalized_permille.saturating_mul(7)
+            + our_latency_canon_permille.saturating_mul(3))
+            / 10;
+        candidates.push((
+            self.local_node_id.clone(),
+            our_combined_permille,
+            our_pou as u32,
+        ));
 
         // Add other members (only current group members with fresh PoU scores)
         let current_group_members = self.group_manager.get_group_members().await;
@@ -1862,17 +1995,31 @@ impl IntraGroupCommunication {
                 );
                 continue;
             }
-            let latency_score = if let Some((latency, _)) = latencies.get(member_id) {
-                // Lower latency = higher score (inverse relationship)
-                1.0 / (1.0 + latency.as_secs_f64())
-            } else {
-                0.5 // Default if no latency measurement
+            // V0.2 Phase 1.4c port (Score Canonicity, issue #31): replace the
+            // per-observer f64 latency_score with a deterministic integer
+            // lookup against the canonical LatencyTable. combined_permille is
+            // computed entirely in u32 — no f64 path remains.
+            //
+            // latency_canon_permille: u32 in [0, 1000], 1000 = fast RTT.
+            // pou_normalized_permille: u32 in [0, 1000] = pou_score / 10.
+            // combined_permille: u32 in [0, 1000] = 70% PoU + 30% latency canon.
+            let group_id_for_lookup = self
+                .group_manager
+                .get_current_group_cached()
+                .map(|g| g.group_id)
+                .unwrap_or_default();
+            let latency_canon_permille: u32 = match self.latency_canon_state.as_ref() {
+                Some(state) => state.lookup_score(&group_id_for_lookup, member_id) as u32,
+                None => 1000, // No table yet (bootstrap) — neutral max.
             };
-
-            let pou_normalized = *pou_score as f64 / 10000.0; // Convert basis points to 0-1
-            let combined_score = (pou_normalized * 0.7) + (latency_score * 0.3); // 70% PoU, 30% latency
-
-            candidates.push((member_id.clone(), combined_score, *pou_score));
+            let pou_normalized_permille: u32 = (*pou_score) / 10;
+            let combined_permille: u32 = (pou_normalized_permille.saturating_mul(7)
+                + latency_canon_permille.saturating_mul(3))
+                / 10;
+            // Silence unused-import warning while the legacy latencies map remains
+            // populated by the GroupPong handler (still wired for diagnostic use).
+            let _ = &latencies;
+            candidates.push((member_id.clone(), combined_permille, *pou_score));
         }
 
         // Sort by integer PoU score (deterministic across all nodes).
@@ -2211,16 +2358,18 @@ impl IntraGroupCommunication {
     /// Broadcast election result to group members
     async fn broadcast_election_result(
         &self,
-        candidates: &[(String, f64, u32)],
+        candidates: &[(String, u32, u32)],
         elected_proposer: &str,
     ) -> Result<()> {
         let group_id = self.get_current_group_id().await;
         let group_id_for_msg = group_id.clone();
 
-        // Convert candidates to expected format
-        let candidates_data: Vec<(String, u32, f64)> = candidates
+        // V0.2 Phase 1.5 port: local candidates tuple is (id, combined_permille, pou_score).
+        // The wire field carries (id, pou_score, combined_permille) so we reorder here.
+        // All u32 — no f64 path remains.
+        let candidates_data: Vec<(String, u32, u32)> = candidates
             .iter()
-            .map(|(id, combined_score, pou_score)| (id.clone(), *pou_score, *combined_score))
+            .map(|(id, combined_permille, pou_score)| (id.clone(), *pou_score, *combined_permille))
             .collect();
 
         let elected_pou_score = candidates

@@ -1192,7 +1192,7 @@ pub struct ProposerElectionCertMessage {
     pub proposer_pubkey: [u8; 32],
     pub proposer_pou_score: u32,
     pub election_timestamp: u64,
-    pub candidates: Vec<(String, u32, f64)>,
+    pub candidates: Vec<(String, u32, u32)>,
     pub attestations: Vec<super::proposal_validator::ElectionAttestation>,
 }
 

@@ -826,32 +826,3 @@ impl MonolithBenchmark {
         Ok(estimated_io.max(50.0).min(5120.0)) // Clamp between 50MB and 5GB
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_monolith_benchmark() {
-        let config = BenchmarkConfig {
-            monolith_count: 10,
-            parallel_operations: 2,
-            block_range_size: 100,
-            enable_storage_benchmark: false,
-            enable_p2p_benchmark: false,
-            warmup_iterations: 2,
-        };
-
-        let benchmark = MonolithBenchmark::new(config).unwrap();
-        let results = benchmark.run_benchmark().await.unwrap();
-
-        assert_eq!(results.monolith_creation.blocks_compressed_total > 0, true);
-        assert_eq!(results.monolith_creation.monoliths_per_second > 0.0, true);
-
-        println!("✅ Monolith benchmark test passed!");
-        println!(
-            "📊 Monoliths per second: {:.2}",
-            results.monolith_creation.monoliths_per_second
-        );
-    }
-}

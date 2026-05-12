@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // © 2026 Savitri Network
 
-//! Tests for the governance system functionality
+//! Tests for the governance system functionality.
+//!
+//! Requires the `contracts` feature, which is opt-in on this crate because
+//! the contract-executor integration is still being refactored to use the
+//! storage trait object. Run with:
+//!     `cargo test -p savitri-masternode --features contracts`
+#![cfg(feature = "contracts")]
 
 use savitri_contracts::governance::proposals::{
     Proposal, ProposalAction, ProposalStatus, ProposalSystem,

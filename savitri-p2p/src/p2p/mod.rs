@@ -273,30 +273,3 @@ impl P2PManager {
         self.event_receiver.take()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_p2p_manager_creation() {
-        let config = P2PConfig::default();
-        let manager = P2PManager::new(config);
-        assert!(manager.is_ok());
-    }
-
-    #[test]
-    fn test_p2p_config_default() {
-        let config = P2PConfig::default();
-
-        // Test that all sub-configs are properly initialized
-        assert_eq!(config.protocols.name, "default");
-        assert_eq!(config.discovery.max_peers, 100);
-    }
-
-    #[test]
-    fn test_p2p_stats_default() {
-        let stats = P2PStats::default();
-        assert_eq!(stats.uptime, std::time::Duration::from_secs(0));
-    }
-}

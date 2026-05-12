@@ -133,7 +133,7 @@ pub struct ElectionCertificate {
     pub elected_proposer_pubkey: [u8; 32],
     pub proposer_pou_score: u32,
     pub timestamp: u64,
-    pub candidates: Vec<(String, u32, f64)>,
+    pub candidates: Vec<(String, u32, u32)>,
     pub attestations: Vec<ElectionAttestation>,
     /// First chain height at which this certificate is valid (Falla 3 anti-replay binding).
     /// `serde(default)` keeps deserialization compatible with older peers that haven't
@@ -790,19 +790,26 @@ impl ProposalValidator {
             //   - group_id: same for all
             //   - tenure_start_height: deterministic snapshot of finalized chain height,
             //     bound into the signed payload to prevent cross-height replay (Falla 3).
+            // V0.2 Phase 2 (Score Canonicity completion, issue #31):
+            // `candidates` and `proposer_pou_score` are INCLUDED. The
+            // canonical LatencyTable is byte-identical cluster-wide
+            // (wall-clock bucket convergence), so all attesters sign
+            // the same bytes — see ProposerElectionResult::signable_bytes
+            // (lightnode) for the full rationale. Validated on testnet
+            // cluster (commit e9be63d): 0 signature verification
+            // failures over a 5-minute loadtest with 44,739 TX accepted
+            // at 100%.
             #[derive(serde::Serialize)]
             struct Signable<'a> {
                 round: u64,
                 elected_proposer: &'a str,
+                proposer_pou_score: u32,
                 sender: &'a str,
                 group_id: &'a str,
+                candidates: &'a [(String, u32, u32)],
                 tenure_start_height: u64,
                 // timestamp: excluded (per-node)
-                // candidates: excluded (contains per-node f64 latency-based scores)
-                // proposer_pou_score: excluded (LNs may have different views of proposer's PoU
-                //   due to gossipsub message loss, causing signature mismatch)
             }
-            // Log the values being used to reconstruct signable bytes
             debug!(
                 signer = %att.signer_peer_id,
                 index = i,
@@ -811,14 +818,16 @@ impl ProposalValidator {
                 sender = %att.signer_peer_id,
                 group_id = %cert.group_id,
                 tenure_start_height = cert.tenure_start_height,
-                "[MN CERT] Reconstructing signable bytes (timestamp+candidates+proposer_pou_score excluded)"
+                "[MN CERT] Reconstructing signable bytes (canonical, includes candidates + proposer_pou_score)"
             );
 
             let signable = match serde_json::to_vec(&Signable {
                 round: cert.election_round,
                 elected_proposer: &cert.elected_proposer_peer_id,
+                proposer_pou_score: cert.proposer_pou_score,
                 sender: &att.signer_peer_id,
                 group_id: &cert.group_id,
+                candidates: &cert.candidates,
                 tenure_start_height: cert.tenure_start_height,
             }) {
                 Ok(b) => {

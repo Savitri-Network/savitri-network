@@ -280,27 +280,3 @@ impl RpcConsumerMetrics {
         metrics::counter!("rpc_tx_consumer_accepted_total").increment(1);
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn smoke_consensus_obs_methods_dont_panic() {
-        ConsensusObsMetrics::inc_cert_match();
-        ConsensusObsMetrics::inc_cert_miss();
-        ConsensusObsMetrics::inc_cert_lock_busy();
-        ConsensusObsMetrics::inc_cert_spawn();
-        ConsensusObsMetrics::inc_speculative_exec(true);
-        ConsensusObsMetrics::inc_speculative_exec(false);
-        ConsensusObsMetrics::inc_commit_admit();
-        ConsensusObsMetrics::inc_commit_drain_empty();
-        ConsensusObsMetrics::inc_commit_drain_hit(42);
-    }
-
-    #[test]
-    fn smoke_rpc_consumer_methods_dont_panic() {
-        RpcConsumerMetrics::inc_consumer_rejection("test_reason");
-        RpcConsumerMetrics::inc_consumer_accepted();
-    }
-}

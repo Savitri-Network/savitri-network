@@ -9,6 +9,10 @@ homepage = "https://savitrinetwork.com"
 repository = "https://github.com/savitri-network/savitri-guardian"
 keywords = ["blockchain", "archive", "backup", "guardian", "savitri"]
 categories = ["blockchain"]
+# Examples under `examples/` import `savitri_guardian::*` but this crate is
+# binary-only (no `lib.rs`), so they don't compile. Keep them as tutorial
+# code but skip cargo's auto-discovery, matching `Savitri-contracts`.
+autoexamples = false
 
 [dependencies]
 # Core dependencies - PUBLISHED VERSIONS
@@ -68,6 +72,11 @@ clap = { version = "4.5", features = ["derive"] }
 default = ["archive", "monitoring"]
 archive = ["rocksdb"]
 monitoring = ["metrics", "metrics-exporter-prometheus", "sysinfo"]
+
+[dev-dependencies]
+# Used by `#[cfg(test)] mod tests` in `archive.rs` for TempDir-backed
+# RocksDB fixtures.
+tempfile = "3"
 
 [[bin]]
 name = "savitri-guardian"

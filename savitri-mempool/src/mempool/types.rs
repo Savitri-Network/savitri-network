@@ -478,7 +478,7 @@ impl SignedTx {
         }
 
         if self.fee > 1_000_000_000 {
-            // 1 SAVI max fee
+            // 1 SAVT max fee
             return Err(anyhow::anyhow!("Fee too high"));
         }
 

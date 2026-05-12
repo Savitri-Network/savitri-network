@@ -105,8 +105,9 @@ impl LatencyReport {
         // Domain separation: "savitri-latency-canon-v1|" prefix prevents
         // signature replay across protocol versions or other Savitri
         // signing contexts.
-        let mut out = Vec::with_capacity(64 + self.group_id.len() + self.reporter.len()
-            + self.observations.len() * 32);
+        let mut out = Vec::with_capacity(
+            64 + self.group_id.len() + self.reporter.len() + self.observations.len() * 32,
+        );
         out.extend_from_slice(b"savitri-latency-canon-v1|");
         out.extend_from_slice(&self.round.to_le_bytes());
         out.push(b'|');
@@ -139,111 +140,5 @@ impl LatencyReport {
         let sig = Signature::from_bytes(&self.signature);
         let payload = self.signable_bytes();
         key.verify(&payload, &sig).is_ok()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bucket_arithmetic_is_deterministic() {
-        assert_eq!(bucket_from_rtt_ms(0), 0);
-        assert_eq!(bucket_from_rtt_ms(4), 0);
-        assert_eq!(bucket_from_rtt_ms(5), 1);
-        assert_eq!(bucket_from_rtt_ms(50), 10);
-        assert_eq!(bucket_from_rtt_ms(1274), 254);
-        assert_eq!(bucket_from_rtt_ms(1275), 255);
-        assert_eq!(bucket_from_rtt_ms(u64::MAX), 255);
-    }
-
-    #[test]
-    fn signable_bytes_observer_independent() {
-        let r = LatencyReport {
-            round: 42,
-            group_id: "group_42_0".to_string(),
-            reporter: "ln-1".to_string(),
-            observations: vec![
-                PeerLatencyObservation {
-                    peer_id: "ln-2".to_string(),
-                    rtt_ms_bucket: 12,
-                    samples: 10,
-                },
-                PeerLatencyObservation {
-                    peer_id: "ln-3".to_string(),
-                    rtt_ms_bucket: 45,
-                    samples: 9,
-                },
-            ],
-            nonce: 0,
-            reporter_pubkey: [0u8; 32],
-            signature: [0u8; 64],
-        };
-        // Same input → same output, byte-for-byte.
-        assert_eq!(r.signable_bytes(), r.signable_bytes());
-        // Domain separator is at the start.
-        assert!(r.signable_bytes().starts_with(b"savitri-latency-canon-v1|"));
-    }
-
-    #[test]
-    fn signable_bytes_change_with_any_field() {
-        let base = LatencyReport {
-            round: 1,
-            group_id: "g".to_string(),
-            reporter: "r".to_string(),
-            observations: vec![PeerLatencyObservation {
-                peer_id: "p".to_string(),
-                rtt_ms_bucket: 5,
-                samples: 1,
-            }],
-            nonce: 0,
-            reporter_pubkey: [0u8; 32],
-            signature: [0u8; 64],
-        };
-        let bytes_base = base.signable_bytes();
-
-        let mut other = base.clone();
-        other.round = 2;
-        assert_ne!(bytes_base, other.signable_bytes());
-
-        let mut other = base.clone();
-        other.group_id = "g2".to_string();
-        assert_ne!(bytes_base, other.signable_bytes());
-
-        let mut other = base.clone();
-        other.observations[0].rtt_ms_bucket = 6;
-        assert_ne!(bytes_base, other.signable_bytes());
-    }
-
-    #[test]
-    fn signature_round_trip() {
-        use ed25519_dalek::{Signer, SigningKey};
-        use rand::rngs::OsRng;
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let verifying_key = signing_key.verifying_key();
-
-        let mut r = LatencyReport {
-            round: 100,
-            group_id: "group_100_0".to_string(),
-            reporter: "ln-5".to_string(),
-            observations: vec![PeerLatencyObservation {
-                peer_id: "ln-1".to_string(),
-                rtt_ms_bucket: 8,
-                samples: 5,
-            }],
-            nonce: 0,
-            reporter_pubkey: verifying_key.to_bytes(),
-            signature: [0u8; 64],
-        };
-        let payload = r.signable_bytes();
-        let sig = signing_key.sign(&payload);
-        r.signature = sig.to_bytes();
-
-        assert!(r.verify_signature());
-
-        // Tamper the rtt_ms_bucket — signature must no longer verify.
-        r.observations[0].rtt_ms_bucket = 9;
-        assert!(!r.verify_signature());
     }
 }

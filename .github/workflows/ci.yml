@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # `workflow_dispatch` lets maintainers re-run CI on demand from the
+  # Actions tab (e.g. after a flaky network failure, or to validate
+  # against a fresh `stable` toolchain without having to push a noop
+  # commit).
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
