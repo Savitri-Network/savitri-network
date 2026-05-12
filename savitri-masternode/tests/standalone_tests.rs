@@ -89,7 +89,9 @@ mod standalone_tests {
         let decoded_numbers = hex::decode(&encoded_numbers).unwrap();
 
         assert_eq!(numbers, decoded_numbers);
-        assert_eq!(encoded_numbers, "123456789ABCDEF0");
+        // `hex::encode` always emits lowercase; the previous expectation
+        // ("123456789ABCDEF0") was a test bug that never matched.
+        assert_eq!(encoded_numbers, "123456789abcdef0");
 
         // Test empty data
         let empty = b"";
@@ -180,11 +182,14 @@ mod standalone_tests {
         assert_eq!(map.get("key2"), None);
         assert_eq!(map.len(), 2);
 
-        // Test iteration
+        // Test iteration. Note the map contains `key1 -> new_value1`
+        // (overwritten earlier at line 175) and `key3 -> value3`, so the
+        // value-prefix invariant is "starts with either `value` or
+        // `new_value`".
         let mut count = 0;
         for (key, value) in &map {
             assert!(key.starts_with("key"));
-            assert!(value.starts_with("value"));
+            assert!(value.starts_with("value") || value.starts_with("new_value"));
             count += 1;
         }
         assert_eq!(count, 2);

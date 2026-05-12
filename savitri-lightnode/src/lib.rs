@@ -18,6 +18,9 @@ pub mod latency_service;
 pub mod latency_canon_publisher;
 #[cfg(feature = "desktop")]
 pub mod latency_canon_state;
+// V0.2 Phase 2 (Lattice ordering runtime, issue #32)
+#[cfg(feature = "desktop")]
+pub mod lattice_runtime;
 #[cfg(feature = "desktop")]
 pub mod logging;
 #[cfg(feature = "desktop")]

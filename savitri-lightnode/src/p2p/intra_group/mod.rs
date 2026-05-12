@@ -121,7 +121,7 @@ pub struct IntraGroupCommunication {
     /// Local node ID
     local_node_id: String,
     /// Group manager
-    group_manager: Arc<P2PGroupManager>,
+    pub group_manager: Arc<P2PGroupManager>,
     /// Signing key for intra-group messages
     signing_key: Arc<Keypair>,
     /// Latency service
@@ -151,7 +151,7 @@ pub struct IntraGroupCommunication {
     /// Group member latency measurements (PeerId -> (Duration, pubkey_hex))
     member_latencies: Arc<RwLock<HashMap<String, (Duration, Option<String>)>>>,
     /// Group member PoU scores (value, last_updated timestamp)
-    member_pou_scores: Arc<RwLock<HashMap<String, (u32, Instant)>>>,
+    pub member_pou_scores: Arc<RwLock<HashMap<String, (u32, Instant)>>>,
     /// Proposer state
     proposer_state: Option<Arc<RwLock<ProposerState>>>,
     /// Set in `create_and_propose_block_at_height` right after submission to

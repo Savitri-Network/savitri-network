@@ -423,6 +423,10 @@ pub async fn start_network(
     // V0.2 Phase 1 (Score Canonicity, issue #31): canon publisher needs an independent
     // clone of the publish sink. The original handle is consumed by the IGC constructor.
     let intra_publish_tx_clone_for_canon = intra_publish_tx.clone();
+    // V0.2 Phase 2 (Lattice ordering, issue #32): the LatticeRuntime
+    // publisher needs its own clone of the publish sink so cell + attestation
+    // broadcasts can run alongside the existing intra-group topics.
+    let intra_publish_tx_clone_for_lattice = intra_publish_tx.clone();
     let pou_scoring = shared_pou_score
         .clone()
         .map(|s| Arc::new(crate::availability::PouScoring::with_shared(s)));
@@ -519,6 +523,47 @@ pub async fn start_network(
                 let c = igc_for_diag.read().await;
                 let _ = c.rebuild_latency_canon_table().await;
             }
+        });
+    }
+
+    // V0.2 Phase 2 (Lattice ordering runtime, issue #32): construct the
+    // LatticeRuntime and spawn its periodic publisher + commit poller.
+    // The runtime owns the LatticeAggregator behind an Arc<RwLock<>>;
+    // we keep a clone of the Arc<LatticeRuntimeState> so the gossipsub
+    // receive branch can call the static process_*_message helpers
+    // without going through the owning value.
+    let lattice_runtime = crate::lattice_runtime::LatticeRuntime::new(
+        local_node_id.clone(),
+        signing_key.clone(),
+        intra_publish_tx_clone_for_lattice.clone(),
+        crate::lattice_runtime::LatticeRuntimeConfig::default(),
+    );
+    let lattice_runtime_state = lattice_runtime.state();
+    {
+        let gm_for_provider = group_manager.clone();
+        let igc_for_provider = intra_group_comm.clone();
+        lattice_runtime.spawn_tasks(move || {
+            let g = gm_for_provider.get_current_group_cached()?;
+            // PoU ranking is whatever Phase 1 produces — read from the
+            // member_pou_scores cache on the IGC. We rank by score
+            // descending with peer_id ascending as canonical tiebreak,
+            // matching determine_proposer's logic exactly.
+            let ranked: Vec<(String, u32)> = match igc_for_provider.try_read() {
+                Ok(igc) => {
+                    if let Ok(pou_map) = igc.member_pou_scores.try_read() {
+                        let mut v: Vec<(String, u32)> = pou_map
+                            .iter()
+                            .map(|(id, (score, _))| (id.clone(), *score))
+                            .collect();
+                        v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        v
+                    } else {
+                        Vec::new()
+                    }
+                }
+                Err(_) => Vec::new(),
+            };
+            Some((g.group_id, ranked))
         });
     }
 
@@ -2598,6 +2643,36 @@ pub async fn start_network(
                                                         let c = comm.read().await;
                                                         if let Err(e) = c.process_latency_canon_message(&data).await {
                                                             tracing::warn!(error = ?e, "latency_canon: process failed");
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                            // V0.2 Phase 2 (Lattice ordering, issue #32) — receive path
+                                            {
+                                                let local_gid = {
+                                                    let comm = intra_group_comm.read().await;
+                                                    comm
+                                                        .group_manager
+                                                        .get_current_group_cached()
+                                                        .map(|g| g.group_id)
+                                                };
+                                                let local_gid_str = local_gid.clone().unwrap_or_default();
+                                                let cell_topic_hash =
+                                                    crate::lattice_runtime::cell_topic_for_group(&local_gid_str).hash();
+                                                let att_topic_hash =
+                                                    crate::lattice_runtime::attestation_topic_for_group(&local_gid_str).hash();
+                                                let rt_state = lattice_runtime_state.clone();
+                                                let data = message.data.clone();
+                                                if message.topic == cell_topic_hash {
+                                                    tokio::spawn(async move {
+                                                        if let Err(e) = crate::lattice_runtime::LatticeRuntime::process_cell_message(&rt_state, local_gid.as_deref(), &data).await {
+                                                            tracing::warn!(error = ?e, "lattice_cell: process failed");
+                                                        }
+                                                    });
+                                                } else if message.topic == att_topic_hash {
+                                                    tokio::spawn(async move {
+                                                        if let Err(e) = crate::lattice_runtime::LatticeRuntime::process_attestation_message(&rt_state, local_gid.as_deref(), &data).await {
+                                                            tracing::warn!(error = ?e, "lattice_attestation: process failed");
                                                         }
                                                     });
                                                 }
@@ -4998,6 +5073,9 @@ pub async fn start_network(
                             (intra_group_latency_topic.clone(), "latency"),
                             // V0.2 Phase 1 (Score Canonicity, issue #31)
                             (crate::latency_canon_publisher::topic_for_group(&group_id_str), "latency_canon"),
+                            // V0.2 Phase 2 (Lattice ordering, issue #32)
+                            (crate::lattice_runtime::cell_topic_for_group(&group_id_str), "lattice_cell"),
+                            (crate::lattice_runtime::attestation_topic_for_group(&group_id_str), "lattice_attestation"),
                             (intra_group_proposal_topic.clone(), "proposal"),
                             (intra_group_vote_topic.clone(), "vote"),
                         ] {

@@ -9,6 +9,8 @@ mod latency_service;
 // V0.2 Phase 1 (Score Canonicity, issue #31)
 mod latency_canon_publisher;
 mod latency_canon_state;
+// V0.2 Phase 2 (Lattice ordering runtime, issue #32)
+mod lattice_runtime;
 mod p2p;
 mod p2p_block_receiver;
 mod p2p_broadcast;
