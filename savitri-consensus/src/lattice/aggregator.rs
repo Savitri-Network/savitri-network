@@ -1,6 +1,39 @@
 //! Cell aggregator — collects raw cells and attestations from gossip,
 //! verifies signatures, emits `CellCertificate`s once BFT quorum is met.
 //!
+//! ## Academic provenance
+//!
+//! Follows the **Narwhal DAG mempool pattern**:
+//!
+//! - **Narwhal & Tusk** [Danezis, Kokoris-Kogias, Sonnino, Spiegelman,
+//!   "Narwhal and Tusk: A DAG-based Mempool and Efficient BFT Consensus",
+//!   EuroSys 2022,
+//!   <https://doi.org/10.1145/3492321.3519594>,
+//!   <https://arxiv.org/abs/2105.11827>]
+//!   introduces the DAG-of-certified-blocks abstraction. Savitri's
+//!   `observe_cell` + `observe_attestation` flow mirrors the Narwhal
+//!   primary-worker protocol, simplified to single-tier (no separate
+//!   worker pool) and adapted to libp2p gossipsub transport.
+//!
+//! - **2f+1 quorum certificate construction** follows classical PBFT
+//!   [Castro & Liskov, "Practical Byzantine Fault Tolerance", OSDI 1999]
+//!   and HotStuff [Yin, Malkhi, Reiter, Gueta, Abraham, PODC 2019,
+//!   <https://doi.org/10.1145/3293611.3331591>,
+//!   <https://arxiv.org/abs/1803.05069>].
+//!
+//! ## Savitri-specific deviations
+//!
+//! - **Single-tier (no worker pool)**: Narwhal separates primary and
+//!   worker nodes; Savitri collapses both into a single LN role.
+//! - **Wire format custom**: ed25519 + serde JSON envelopes vs Narwhal's
+//!   bincode-over-tonic.
+//! - **Retention window**: explicit `retention_rounds` cap with GC pass
+//!   in the publisher loop (Narwhal uses garbage collection tied to
+//!   committed round).
+//! - **No per-author rate limit**: relies on group-membership filter
+//!   from `LatticeRuntime`'s receive side, not on Narwhal's primary
+//!   rate limiting.
+//!
 //! Part of Savitri V0.2 Phase 2 (Lattice ordering). This module is the
 //! receive-side runtime that turns the wire-format primitives in
 //! `crate::types::lattice` into a usable DAG state machine.

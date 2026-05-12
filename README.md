@@ -1,6 +1,7 @@
 # Savitri Network
 
 [![CI](https://github.com/Savitri-Network/savitri-network/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Savitri-Network/savitri-network/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Savitri-Network/savitri-network?include_prereleases&sort=semver&color=blue)](https://github.com/Savitri-Network/savitri-network/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.90%2B-orange.svg?logo=rust)](https://www.rust-lang.org/)
 [![Edition](https://img.shields.io/badge/edition-2021-orange.svg?logo=rust)](https://doc.rust-lang.org/edition-guide/rust-2021/index.html)
@@ -9,9 +10,10 @@
 [![RocksDB](https://img.shields.io/badge/storage-RocksDB-2E7D32?logo=database&logoColor=white)](https://rocksdb.org/)
 [![Tokio](https://img.shields.io/badge/runtime-tokio-blue.svg)](https://tokio.rs/)
 [![JSON-RPC](https://img.shields.io/badge/api-JSON--RPC%202.0-orange.svg)](https://www.jsonrpc.org/specification)
-[![Consensus](https://img.shields.io/badge/consensus-PoU%20%2B%20BFT-brightgreen.svg)]()
+[![Consensus](https://img.shields.io/badge/consensus-PoU%20%2B%20BFT%20%2B%20Lattice-brightgreen.svg)](docs/CONSENSUS_V0.2_DESIGN.md)
 [![ZKP](https://img.shields.io/badge/ZK-arkworks%20%7C%20halo2-9C27B0.svg)]()
 [![Status](https://img.shields.io/badge/status-pre--release-yellow.svg)]()
+[![Changelog](https://img.shields.io/badge/changelog-keepachangelog-orange.svg)](CHANGELOG.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 Savitri Network is a high-performance blockchain protocol implementing

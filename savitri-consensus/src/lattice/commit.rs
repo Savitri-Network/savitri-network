@@ -1,5 +1,32 @@
-//! Lineage commit — Bullshark-family rule that decides cycle commits
-//! and emits the deterministic ordering of committed cells.
+//! Lineage commit — implements the **Bullshark commit rule** adapted
+//! to Savitri's wall-clock-bucketed round model.
+//!
+//! ## Academic provenance
+//!
+//! - **Bullshark** [Spiegelman, Giridharan, Sonnino, Kokoris-Kogias,
+//!   "Bullshark: DAG BFT Protocols Made Practical", ACM CCS 2022,
+//!   <https://doi.org/10.1145/3548606.3559361>,
+//!   <https://arxiv.org/abs/2201.05677>]
+//!   provides the anchor + follower commit rule. Savitri reuses the
+//!   2f+1 follower-vote criterion verbatim.
+//!
+//! - **DAG-Rider** [Keidar, Kokoris-Kogias, Naor, Spiegelman, PODC 2021,
+//!   <https://doi.org/10.1145/3465084.3467905>,
+//!   <https://arxiv.org/abs/2102.08325>]
+//!   is the foundational DAG-BFT design Bullshark refines.
+//!
+//! ## Savitri-specific deviations from the papers
+//!
+//! 1. **Deterministic topological ordering**: round-major ascending
+//!    then author-lex ascending. The papers admit any total order
+//!    extending DAG order; we fix one so two observers produce
+//!    byte-identical commit outputs without coordination.
+//! 2. **Wall-clock-bucketed rounds** (see `lattice_runtime.rs`):
+//!    rounds are `unix_secs / N` rather than derived from DAG depth.
+//!    Trades NTP dependence for global-view convergence.
+//! 3. **PoU-weighted pivot selection** (see `lattice::pivot`): reuses
+//!    Savitri's existing PoU EMA score in place of stake-weighted or
+//!    uniform random pivot.
 //!
 //! Part of Savitri V0.2 Phase 2 (Lattice ordering, issue #32 follow-up
 //! to #31). Sits on top of [`crate::lattice::aggregator::LatticeAggregator`]

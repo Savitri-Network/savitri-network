@@ -1,6 +1,40 @@
 //! Cycle pivot election — maps a cycle index to the elected pivot
 //! author using the existing PoU-weighted round-robin schedule.
 //!
+//! ## Academic provenance
+//!
+//! The notion of a *pivot author* (called "anchor" or "leader" in the
+//! DAG-BFT literature) comes from:
+//!
+//! - **DAG-Rider** [Keidar et al., PODC 2021, <https://arxiv.org/abs/2102.08325>]
+//!   uses a random oracle to pick the leader of each wave.
+//! - **Bullshark** [Spiegelman et al., CCS 2022, <https://arxiv.org/abs/2201.05677>]
+//!   uses a public-coin shared randomness beacon for anchor selection.
+//!
+//! Weighted (rather than uniform) leader/committee selection follows
+//! the **Algorand** lineage:
+//!
+//! - **Algorand committee selection** [Gilad, Hemo, Micali, Vlachos,
+//!   Zeldovich, "Algorand: Scaling Byzantine Agreements for
+//!   Cryptocurrencies", SOSP 2017,
+//!   <https://doi.org/10.1145/3132747.3132757>] uses VRF-based
+//!   cryptographic sortition weighted by stake.
+//!
+//! ## Savitri-specific deviations
+//!
+//! 1. **VRF substituted by blake3-seeded Fisher-Yates shuffle**: deterministic
+//!    given `(group_id, cycle_index/PIVOT_TENURE_SLOTS)` seed. Trade-off:
+//!    no per-slot unpredictability that VRF gives, but full
+//!    cluster-wide convergence without a distributed randomness beacon.
+//! 2. **PoU score in place of stake**: Savitri's 5-component reputation
+//!    EMA (availability 25%, latency 20%, integrity 20%, reputation 20%,
+//!    participation 15%) replaces capital-stake as the weighting input.
+//!    This makes pivot selection **behaviour-weighted**, not
+//!    capital-weighted. To the best of our knowledge, no production L1
+//!    has shipped a multi-attribute reputation score for DAG-BFT
+//!    anchor selection — this is one of Savitri's original
+//!    contributions.
+//!
 //! Part of Savitri V0.2 Phase 2 (Lattice ordering). The election
 //! primitive is unchanged from Phase 1: the helper
 //! `build_weighted_proposer_schedule` already produces a deterministic
