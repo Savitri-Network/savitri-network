@@ -39,15 +39,19 @@
 //!
 //! ## Status
 //!
-//! Phase 2.4.1: skeleton + publisher + commit poller, observation-only
-//! by default. Authoritative-mode chain hook is a TODO marked in code
-//! with `phase2-authoritative` comment for the follow-up issue.
+//! Phase 2.4.2: skeleton + publisher + commit poller + observability
+//! counters + per-cycle DIAG snapshot. Observation-only by default.
+//! Authoritative-mode chain hook remains a TODO marked in code with
+//! `phase2-authoritative` comment; spec for the hook will land in
+//! issue #33 (Phase 2.5 design).
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use ed25519_dalek::Signer;
 use libp2p::gossipsub::IdentTopic;
+#[cfg(feature = "metrics")]
+use metrics::{counter, gauge};
 use savitri_consensus::lattice::{
     AggregatorConfig, AttestationOutcome, CommitDecision, LatticeAggregator, LineageCommit,
 };
@@ -58,6 +62,31 @@ use savitri_consensus::types::lattice::{
 use savitri_core::crypto::Keypair;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, info, warn};
+
+// ---------------------------------------------------------------------------
+// Observability counters (Phase 2.4.2)
+// ---------------------------------------------------------------------------
+//
+// Counters are emitted via the `metrics` crate when the feature is enabled.
+// Naming follows the pattern documented in `docs/CONSENSUS_V0.2_DESIGN.md` §6.1
+// for LatencyCanon. All counters carry a `group` label so per-group rates are
+// visible in Prometheus.
+//
+//   lattice_cells_received_total{group}        // bytes off the gossip wire
+//   lattice_cells_observed_total{group, outcome=accepted|rejected}
+//   lattice_attestations_observed_total{group, outcome=certified|pending|already|rejected}
+//   lattice_cycles_committed_total{group}
+//   lattice_commit_decisions_total{group, outcome=committed|anchor_missing|below_follower_quorum}
+//
+// Gauges sampled in the commit-poller loop (so they refresh ~every cycle):
+//   lattice_pending_cells{group}
+//   lattice_certified_cells{group}
+//   lattice_last_committed_cycle{group}
+//
+// `metrics` is a no-op crate when the `metrics` feature is off — emitting a
+// counter is then a literal nothing-burger at runtime, so the cfg gating is
+// mostly for build-time dep hygiene (the `metrics` crate is optional on
+// `savitri-lightnode`).
 
 /// Gossip topic prefix for raw cell broadcasts.
 pub const LATTICE_CELL_TOPIC_PREFIX: &str = "/savitri/group/";
@@ -249,6 +278,9 @@ impl LatticeRuntime {
                 return Ok(());
             }
         };
+        let group_label = cell.group_id.clone();
+        #[cfg(feature = "metrics")]
+        counter!("lattice_cells_received_total", "group" => group_label.clone()).increment(1);
         // Group filter.
         match local_group_id {
             Some(gid) if gid == cell.group_id => {}
@@ -265,8 +297,24 @@ impl LatticeRuntime {
         let cell_id = {
             let mut agg = state.aggregator.write().await;
             match agg.observe_cell(cell.clone()) {
-                Ok(id) => id,
+                Ok(id) => {
+                    #[cfg(feature = "metrics")]
+                    counter!(
+                        "lattice_cells_observed_total",
+                        "group" => group_label.clone(),
+                        "outcome" => "accepted"
+                    )
+                    .increment(1);
+                    id
+                }
                 Err(e) => {
+                    #[cfg(feature = "metrics")]
+                    counter!(
+                        "lattice_cells_observed_total",
+                        "group" => group_label.clone(),
+                        "outcome" => "rejected"
+                    )
+                    .increment(1);
                     warn!(error = %e, "Lattice: observe_cell rejected, ignoring");
                     return Ok(());
                 }
@@ -314,6 +362,13 @@ impl LatticeRuntime {
         };
         match outcome {
             AttestationOutcome::Certified(cert) => {
+                #[cfg(feature = "metrics")]
+                counter!(
+                    "lattice_attestations_observed_total",
+                    "group" => cert.cell.group_id.clone(),
+                    "outcome" => "certified"
+                )
+                .increment(1);
                 info!(
                     target: "savitri::lattice",
                     cell_round = cert.cell.round,
@@ -327,6 +382,12 @@ impl LatticeRuntime {
                 signer_count,
                 quorum,
             } => {
+                #[cfg(feature = "metrics")]
+                counter!(
+                    "lattice_attestations_observed_total",
+                    "outcome" => "pending"
+                )
+                .increment(1);
                 debug!(
                     target: "savitri::lattice",
                     signer_count,
@@ -335,12 +396,24 @@ impl LatticeRuntime {
                 );
             }
             AttestationOutcome::AlreadyCertified => {
+                #[cfg(feature = "metrics")]
+                counter!(
+                    "lattice_attestations_observed_total",
+                    "outcome" => "already_certified"
+                )
+                .increment(1);
                 debug!(
                     target: "savitri::lattice",
                     "Lattice attestation: cell already certified, ignoring"
                 );
             }
             AttestationOutcome::Rejected(err) => {
+                #[cfg(feature = "metrics")]
+                counter!(
+                    "lattice_attestations_observed_total",
+                    "outcome" => "rejected"
+                )
+                .increment(1);
                 debug!(
                     target: "savitri::lattice",
                     error = %err,
@@ -488,6 +561,20 @@ async fn commit_poller_loop<F>(
             drop(agg);
             match outcome {
                 CommitDecision::Committed(cy) => {
+                    #[cfg(feature = "metrics")]
+                    {
+                        counter!(
+                            "lattice_cycles_committed_total",
+                            "group" => group_id.clone()
+                        )
+                        .increment(1);
+                        counter!(
+                            "lattice_commit_decisions_total",
+                            "group" => group_id.clone(),
+                            "outcome" => "committed"
+                        )
+                        .increment(1);
+                    }
                     info!(
                         target: "savitri::lattice",
                         cycle = cy.index,
@@ -505,14 +592,55 @@ async fn commit_poller_loop<F>(
                         );
                     }
                 }
-                CommitDecision::AnchorNotCertified | CommitDecision::BelowFollowerQuorum { .. } => {
+                CommitDecision::AnchorNotCertified => {
+                    #[cfg(feature = "metrics")]
+                    counter!(
+                        "lattice_commit_decisions_total",
+                        "group" => group_id.clone(),
+                        "outcome" => "anchor_missing"
+                    )
+                    .increment(1);
                     // Stop attempting further cycles — once a cycle
                     // is blocked, later cycles are blocked too (their
                     // anchor depends on the same DAG).
                     break;
                 }
+                CommitDecision::BelowFollowerQuorum { .. } => {
+                    #[cfg(feature = "metrics")]
+                    counter!(
+                        "lattice_commit_decisions_total",
+                        "group" => group_id.clone(),
+                        "outcome" => "below_follower_quorum"
+                    )
+                    .increment(1);
+                    break;
+                }
             }
         }
+
+        // Phase 2.4.2: sample aggregator state + emit DIAG line every
+        // commit-poller tick (i.e. every cycle = 2 lattice rounds, so
+        // every ~10s with the default LATTICE_ROUND_DURATION_SECS).
+        let (pending_count, certified_count) = {
+            let agg = state.aggregator.read().await;
+            (agg.pending_count(), agg.certified_count())
+        };
+        #[cfg(feature = "metrics")]
+        {
+            gauge!("lattice_pending_cells", "group" => group_id.clone()).set(pending_count as f64);
+            gauge!("lattice_certified_cells", "group" => group_id.clone())
+                .set(certified_count as f64);
+            gauge!("lattice_last_committed_cycle", "group" => group_id.clone())
+                .set(last_committed_cycle.unwrap_or(0) as f64);
+        }
+        info!(
+            target: "savitri::lattice",
+            group = %group_id,
+            pending = pending_count,
+            certified = certified_count,
+            last_cycle = last_committed_cycle.unwrap_or(0),
+            "DIAG[lattice] aggregator state snapshot"
+        );
 
         // GC old cells.
         let evicted = {
