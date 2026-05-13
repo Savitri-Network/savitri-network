@@ -1337,6 +1337,30 @@ pub async fn lattice_chain_consumer_loop(
             }
         }
 
+        // P2.6-C.2 Phase B.1: deserialize-preview of the merged TX
+        // bytes as TransactionExt — purely diagnostic, no Block built
+        // and no broadcast. Surfaces wire-format integrity issues
+        // (e.g. corrupted batch_root sources) before Phase B.2 starts
+        // doing real chain construction.
+        let mut deser_ok: usize = 0;
+        let mut deser_err: usize = 0;
+        for raw in &block.merged_tx_bytes {
+            match crate::tx::deserialize_signed_tx(raw) {
+                Ok(_) => deser_ok += 1,
+                Err(_) => deser_err += 1,
+            }
+        }
+        if !block.merged_tx_bytes.is_empty() {
+            info!(
+                target: "savitri::lattice",
+                cycle = block.cycle_index,
+                tx_count = block.merged_tx_bytes.len(),
+                deser_ok,
+                deser_err,
+                "P2.6-C.2 Phase B.1 shadow block deserialization preview"
+            );
+        }
+
         if total_blocks % 50 == 0 {
             info!(
                 target: "savitri::lattice",
