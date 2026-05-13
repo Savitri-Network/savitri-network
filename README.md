@@ -15,7 +15,7 @@
 [![Status](https://img.shields.io/badge/status-pre--release-yellow.svg)]()
 [![Changelog](https://img.shields.io/badge/changelog-keepachangelog-orange.svg)](CHANGELOG.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Savitri-Network/savitri-network?quickstart=1)
 Savitri Network is a high-performance blockchain protocol implementing
 **Proof-of-Unity (PoU)** consensus with Byzantine Fault Tolerant (BFT)
 voting, written in Rust.
