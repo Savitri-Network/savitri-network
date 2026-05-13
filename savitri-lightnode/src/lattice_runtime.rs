@@ -177,6 +177,37 @@ pub struct BatchEnvelope {
     pub raw_bytes: Vec<Vec<u8>>,
 }
 
+/// P2.6-C.1: in-process message emitted by the commit_poller_loop
+/// whenever a cycle commits. Carries enough state for the chain hook
+/// (or any other consumer) to reconstruct the committed batch in
+/// canonical order — without going back to the aggregator.
+///
+/// Lives in-process only (no wire format) — the consumer is the
+/// chain state machine, attached via `LatticeRuntimeState::chain_sink`.
+#[derive(Clone, Debug)]
+pub struct CommittedLatticeBlock {
+    pub cycle_index: CycleIndex,
+    pub group_id: String,
+    pub pivot: String,
+    /// Committed cells in canonical order (round-major asc, then
+    /// author lex asc) — mirrors `Cycle::committed_cells`.
+    pub committed_cells: Vec<CellId>,
+    /// Number of cells whose batch was found in the local cache.
+    pub batch_hits: usize,
+    /// Number of cells whose batch was NOT in the local cache
+    /// (e.g. arrived from a peer before B.4a was deployed, or fell
+    /// out of the retention window before commit). Such cells are
+    /// dropped from `merged_tx_bytes`.
+    pub batch_misses: usize,
+    /// Total bytes count (sum of all raw_bytes len) — convenient
+    /// metric for DIAG counters.
+    pub total_tx_bytes_len: usize,
+    /// Flattened raw signed TX bytes in canonical commit order. The
+    /// chain consumer can deserialize each `Vec<u8>` as a SignedTx
+    /// and append to the next block.
+    pub merged_tx_bytes: Vec<Vec<u8>>,
+}
+
 /// Wire-format envelope for an attestation gossipsub message. We need
 /// to carry both the `cell_id` (so the receiver can look up the cell)
 /// and the `CellAttestation` itself (with signer pubkey + signature).
@@ -221,6 +252,12 @@ pub struct LatticeRuntimeState {
     /// before chain submission; the bytes are also the canonical
     /// form on the wire (BatchEnvelope.raw_bytes).
     pub batch_cache: Arc<RwLock<std::collections::BTreeMap<CellId, Vec<Vec<u8>>>>>,
+    /// P2.6-C.1: optional chain-side sink. When Some and
+    /// `is_authoritative_mode() == true`, the commit poller forwards
+    /// every committed cycle (CommittedLatticeBlock) here for chain
+    /// state-machine consumption. None disables the forward (the
+    /// default in observation-only mode).
+    pub chain_sink: Option<mpsc::Sender<CommittedLatticeBlock>>,
 }
 
 /// Configuration knobs for the runtime tasks. Defaults are tuned for
@@ -275,6 +312,22 @@ pub struct LatticeRuntime {
 
 impl LatticeRuntime {
     /// Construct a new runtime. No tasks spawned yet.
+    /// P2.6-C.1: replace the chain_sink on the state Arc. Used by
+    /// the network task once the chain side of the integration is
+    /// ready to consume committed cycles. No-op if the inner Arc
+    /// has more than one strong reference (i.e. spawn_tasks has
+    /// already cloned the state). In that case wire the sink BEFORE
+    /// calling spawn_tasks.
+    pub fn set_chain_sink(&mut self, sink: mpsc::Sender<CommittedLatticeBlock>) -> bool {
+        match Arc::get_mut(&mut self.state) {
+            Some(s) => {
+                s.chain_sink = Some(sink);
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn new(
         local_peer_id: String,
         signing_key: Arc<Keypair>,
@@ -297,6 +350,9 @@ impl LatticeRuntime {
             mempool_handle,
             tx_per_cell_cap,
             batch_cache,
+            // P2.6-C.1: chain sink remains None until the chain
+            // integration wires it in P2.6-C.2.
+            chain_sink: None,
         });
         Self { state, config }
     }
@@ -853,13 +909,91 @@ async fn commit_poller_loop<F>(
                         "DIAG[lattice-commit] cycle committed"
                     );
                     last_committed_cycle = Some(cycle);
-                    // phase2-authoritative: in v2 mode the caller would
-                    // forward `cy` to the chain state machine here.
+
+                    // P2.6-C.1: build a CommittedLatticeBlock by walking
+                    // cy.committed_cells (canonical order), looking up
+                    // each cell's batch_cache entry, and concatenating
+                    // raw bytes. Track hits/misses for DIAG visibility.
+                    let cache_snapshot = state.batch_cache.read().await;
+                    let mut hits: usize = 0;
+                    let mut misses: usize = 0;
+                    let mut merged: Vec<Vec<u8>> = Vec::new();
+                    let mut total_bytes: usize = 0;
+                    for cell_id in &cy.committed_cells {
+                        match cache_snapshot.get(cell_id) {
+                            Some(bytes_vec) => {
+                                hits += 1;
+                                for b in bytes_vec {
+                                    total_bytes += b.len();
+                                    merged.push(b.clone());
+                                }
+                            }
+                            None => {
+                                misses += 1;
+                            }
+                        }
+                    }
+                    drop(cache_snapshot);
+
+                    info!(
+                        target: "savitri::lattice",
+                        cycle = cy.index,
+                        cells = cy.committed_cells.len(),
+                        batch_hits = hits,
+                        batch_misses = misses,
+                        tx_count = merged.len(),
+                        bytes = total_bytes,
+                        "DIAG[lattice-block] chain-block reconstructed"
+                    );
+
+                    #[cfg(feature = "metrics")]
+                    {
+                        counter!(
+                            "lattice_block_batch_hits_total",
+                            "group" => group_id.clone()
+                        )
+                        .increment(hits as u64);
+                        counter!(
+                            "lattice_block_batch_misses_total",
+                            "group" => group_id.clone()
+                        )
+                        .increment(misses as u64);
+                        gauge!(
+                            "lattice_block_tx_count",
+                            "group" => group_id.clone()
+                        )
+                        .set(merged.len() as f64);
+                    }
+
+                    // P2.6-C.1: forward to chain sink in authoritative
+                    // mode. Best-effort send — if the chain consumer
+                    // dropped its receiver we log and continue (it can
+                    // catch up later via persistence in P2.6-D).
                     if is_authoritative_mode() {
-                        debug!(
-                            target: "savitri::lattice",
-                            "phase2-authoritative: chain hook not yet wired"
-                        );
+                        if let Some(sink) = state.chain_sink.as_ref() {
+                            let block = CommittedLatticeBlock {
+                                cycle_index: cy.index,
+                                group_id: cy.group_id.clone(),
+                                pivot: cy.pivot.clone(),
+                                committed_cells: cy.committed_cells.clone(),
+                                batch_hits: hits,
+                                batch_misses: misses,
+                                total_tx_bytes_len: total_bytes,
+                                merged_tx_bytes: merged,
+                            };
+                            if sink.try_send(block).is_err() {
+                                warn!(
+                                    target: "savitri::lattice",
+                                    cycle = cy.index,
+                                    "phase2-authoritative: chain_sink send failed (full or closed)"
+                                );
+                            }
+                        } else {
+                            debug!(
+                                target: "savitri::lattice",
+                                "phase2-authoritative: no chain_sink wired, dropping block"
+                            );
+                        }
                     }
                 }
                 CommitDecision::AnchorNotCertified => {
