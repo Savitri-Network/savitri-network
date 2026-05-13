@@ -588,21 +588,15 @@ pub async fn start_network(
                         v
                     }
                     Err(_) => {
-                        let mut v: Vec<(String, u32)> = g
-                            .members
-                            .iter()
-                            .map(|m| (m.clone(), 0u32))
-                            .collect();
+                        let mut v: Vec<(String, u32)> =
+                            g.members.iter().map(|m| (m.clone(), 0u32)).collect();
                         v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
                         v
                     }
                 },
                 Err(_) => {
-                    let mut v: Vec<(String, u32)> = g
-                        .members
-                        .iter()
-                        .map(|m| (m.clone(), 0u32))
-                        .collect();
+                    let mut v: Vec<(String, u32)> =
+                        g.members.iter().map(|m| (m.clone(), 0u32)).collect();
                     v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
                     v
                 }
