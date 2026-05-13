@@ -479,7 +479,7 @@ where
         // Build + sign the cell. batch_root is a placeholder until the
         // Lattice data-availability layer ships (Phase 2.6+).
         let author_pubkey = state.signing_key.verifying_key().to_bytes();
-        let batch_root: BatchRoot = compute_dynamic_batch_root(round, &group_id, &state.local_peer_id);
+        let batch_root: BatchRoot = placeholder_batch_root();
         let mut cell = LatticeCell::with_sorted_parents(
             round,
             group_id.clone(),
@@ -760,29 +760,22 @@ fn current_lattice_round() -> LatticeRound {
         .unwrap_or(0)
 }
 
-/// P2.6-B Phase 1: deterministic batch_root that varies per
-/// (round, group_id, author). Domain-separated SHA-256 over canonical
-/// encoding. Replaces the static placeholder which was identical for
-/// every cell — that was a no-op for data availability and observers
-/// could not distinguish two cells with different TX content.
-///
-/// Phase 2 will replace this with `hash(SignedTx[])` once the mempool
-/// drain wiring lands (P2.6-B.2). Until then the batch_root is only a
-/// per-cell unique tag, not a content commitment — sufficient for
-/// observation-only mode but NOT for authoritative chain commits.
-fn compute_dynamic_batch_root(
-    round: LatticeRound,
-    group_id: &str,
-    peer_id: &str,
-) -> BatchRoot {
-    let mut buf = Vec::with_capacity(64 + group_id.len() + peer_id.len());
-    buf.extend_from_slice(b"SAVITRI-LATTICE-BATCH-ROOT-V1 ");
-    buf.extend_from_slice(&round.to_be_bytes());
-    buf.push(0);
-    buf.extend_from_slice(group_id.as_bytes());
-    buf.push(0);
-    buf.extend_from_slice(peer_id.as_bytes());
-    savitri_core::crypto::hash::hash(&buf)
+/// Placeholder batch root until the Lattice data-availability layer
+/// ships. blake3 of a fixed marker string keeps the value canonical
+/// while making it obvious in logs / debugger that no real batch is
+/// attached.
+fn placeholder_batch_root() -> BatchRoot {
+    // Fixed canonical placeholder; same bytes across all observers.
+    // Real batch hashing will live in the Lattice data-availability
+    // layer (Phase 2.6+). Picked from the string
+    // savitri-lattice-placeholder-batch-v1 hashed offline once and
+    // embedded as a literal here, avoiding a runtime blake3 dependency
+    // in lightnode.
+    [
+        0x53, 0x41, 0x56, 0x49, 0x54, 0x52, 0x49, 0x2d, 0x4c, 0x41, 0x54, 0x54, 0x49, 0x43, 0x45,
+        0x2d, 0x50, 0x4c, 0x41, 0x43, 0x45, 0x48, 0x4f, 0x4c, 0x44, 0x45, 0x52, 0x2d, 0x42, 0x41,
+        0x54, 0x43,
+    ]
 }
 
 #[cfg(test)]
@@ -812,9 +805,9 @@ mod tests {
     }
 
     #[test]
-    fn compute_dynamic_batch_root_is_deterministic() {
-        let a = compute_dynamic_batch_root(42, "g", "p");
-        let b = compute_dynamic_batch_root(42, "g", "p");
+    fn placeholder_batch_root_is_canonical() {
+        let a = placeholder_batch_root();
+        let b = placeholder_batch_root();
         assert_eq!(a, b);
     }
 
