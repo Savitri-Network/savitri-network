@@ -449,16 +449,31 @@ where
         // given wall-clock tick share the same round index.
         let round = current_lattice_round();
 
-        // Parents: certified cells at round-1, up to a sensible cap.
-        // Empty for round 0.
+        // P2.6-A.10: Parents window widened from strict round-1 to
+        // round-K..=round-1 (K=3). This collects certified cells that
+        // arrived late (attestation propagation jitter cross-VM), so
+        // the pivot anchor at round 2k still appears as a parent in
+        // follow cells at round 2k+1 even when 2k certification lands
+        // a tick or two later. Cap stays at 16 cells total to keep
+        // the wire small.
+        const PARENTS_LOOKBACK_ROUNDS: u64 = 3;
         let parents: Vec<CellId> = if round == 0 {
             Vec::new()
         } else {
             let agg = state.aggregator.read().await;
-            agg.certified_at_round(round - 1)
-                .map(|c| c.cell_id())
-                .take(16) // cap parents per cell to keep the wire small
-                .collect()
+            let lo = round.saturating_sub(PARENTS_LOOKBACK_ROUNDS);
+            let hi = round.saturating_sub(1);
+            let mut acc: Vec<CellId> = Vec::with_capacity(16);
+            // Walk recent rounds in descending order so we prefer the
+            // most-recent certified cells when the 16-cap saturates.
+            for r in (lo..=hi).rev() {
+                for cert in agg.certified_at_round(r) {
+                    if acc.len() >= 16 { break; }
+                    acc.push(cert.cell_id());
+                }
+                if acc.len() >= 16 { break; }
+            }
+            acc
         };
 
         // Build + sign the cell. batch_root is a placeholder until the

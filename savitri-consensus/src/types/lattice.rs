@@ -64,7 +64,7 @@ pub type CycleIndex = u64;
 
 /// Default lattice round duration. Conservative starting point — tune
 /// once the consensus pipeline is exercised on the testnet cluster.
-pub const LATTICE_ROUND_DURATION_SECS: u64 = 1;
+pub const LATTICE_ROUND_DURATION_SECS: u64 = 2;
 
 /// Stable identifier for a single cell. blake3 hash over the cell's
 /// canonical signable bytes.
