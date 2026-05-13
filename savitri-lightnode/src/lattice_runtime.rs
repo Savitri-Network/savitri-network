@@ -96,6 +96,15 @@ pub const LATTICE_CELL_TOPIC_SUFFIX: &str = "/lattice/cell/1";
 pub const LATTICE_ATTESTATION_TOPIC_PREFIX: &str = "/savitri/group/";
 pub const LATTICE_ATTESTATION_TOPIC_SUFFIX: &str = "/lattice/attestation/1";
 
+/// P2.6-B.4a: gossip topic prefix for batch envelope broadcasts.
+/// When the Lattice publisher peeks a non-empty TX batch from the
+/// mempool, it ships (a) the cell on the cell topic and (b) a
+/// BatchEnvelope on this topic so co-grouped peers can populate
+/// their batch_cache and the chain hook (P2.6-C) can reconstruct
+/// the cycle's TX content without re-draining the mempool.
+pub const LATTICE_BATCH_TOPIC_PREFIX: &str = "/savitri/group/";
+pub const LATTICE_BATCH_TOPIC_SUFFIX: &str = "/lattice/batch/1";
+
 /// Env var controlling whether the Lattice runtime is authoritative
 /// over chain commits. Default behaviour (unset or `v1`) is
 /// observation-only.
@@ -119,12 +128,53 @@ pub fn attestation_topic_for_group(group_id: &str) -> IdentTopic {
     ))
 }
 
+/// P2.6-B.4a: build the batch envelope gossip topic for a group.
+#[inline]
+pub fn batch_topic_for_group(group_id: &str) -> IdentTopic {
+    IdentTopic::new(format!(
+        "{}{}{}",
+        LATTICE_BATCH_TOPIC_PREFIX, group_id, LATTICE_BATCH_TOPIC_SUFFIX
+    ))
+}
+
 /// Convenience: is the runtime authoritative on chain commits?
 #[inline]
 pub fn is_authoritative_mode() -> bool {
     std::env::var(CONSENSUS_VERSION_ENV)
         .map(|v| v.eq_ignore_ascii_case("v2"))
         .unwrap_or(false)
+}
+
+/// P2.6-B.4a: wire-format envelope for the batch broadcast topic.
+///
+/// Published alongside each LatticeCell that contains a non-empty
+/// peeked TX batch. Receivers verify the batch_root matches the
+/// signature_hashes carried in the envelope (replay-resistant
+/// content commitment), then insert the raw signed bytes into
+/// batch_cache for the chain hook in P2.6-C.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BatchEnvelope {
+    /// Hash identifier of the cell whose batch_root commits to this
+    /// payload. Used as the batch_cache key on the receiver side.
+    pub cell_id: CellId,
+    /// The cell's `batch_root` field — receiver recomputes from
+    /// sig_hashes and drops the envelope on mismatch.
+    pub batch_root: BatchRoot,
+    /// Lattice round of the parent cell (for batch_root V2
+    /// reconstruction).
+    pub round: LatticeRound,
+    /// Group identifier of the parent cell (for batch_root V2
+    /// reconstruction).
+    pub group_id: String,
+    /// Peer_id of the cell author (for batch_root V2
+    /// reconstruction).
+    pub author: String,
+    /// Per-TX signature_hash values, parallel to `raw_bytes`. Used
+    /// for batch_root verification on the receiver.
+    pub sig_hashes: Vec<[u8; 32]>,
+    /// Raw signed TX bytes, parallel to `sig_hashes`. Stored in
+    /// batch_cache verbatim once verification passes.
+    pub raw_bytes: Vec<Vec<u8>>,
 }
 
 /// Wire-format envelope for an attestation gossipsub message. We need
@@ -158,17 +208,19 @@ pub struct LatticeRuntimeState {
     /// P2.6-B.2: cached cap for the publisher (mirrors config to avoid
     /// crossing the runtime->state boundary inside the loop).
     pub tx_per_cell_cap: usize,
-    /// P2.6-B.3: local cache of (cell_id -> peeked TX batch) for cells
-    /// authored by THIS lightnode. Used by the chain hook (P2.6-C) to
-    /// recover the TX content of a committed cycle. Bounded by retention
-    /// window — entries are evicted on commit_poller tick after the
-    /// matching certified cell ages out of the aggregator.
+    /// P2.6-B.3 + P2.6-B.4a: local cache of (cell_id -> raw signed
+    /// TX bytes) for cells that are either authored by THIS lightnode
+    /// OR received via the batch broadcast topic (P2.6-B.4a). Used by
+    /// the chain hook (P2.6-C) to recover the TX content of a
+    /// committed cycle. Bounded by retention window — entries are
+    /// evicted on commit_poller tick after the matching certified
+    /// cell ages out of the aggregator.
     ///
-    /// Only contains own-authored entries (we peek the local mempool,
-    /// not anyone else's). P2.6-B.4 will add a side-channel for peers
-    /// to fetch batches by `batch_root` if the local cache miss occurs
-    /// during commit.
-    pub batch_cache: Arc<RwLock<std::collections::BTreeMap<CellId, Vec<savitri_mempool::mempool::types::MempoolTx>>>>,
+    /// Stored as raw signed bytes (Vec<u8>) rather than MempoolTx
+    /// because the chain hook re-deserializes them as SignedTx
+    /// before chain submission; the bytes are also the canonical
+    /// form on the wire (BatchEnvelope.raw_bytes).
+    pub batch_cache: Arc<RwLock<std::collections::BTreeMap<CellId, Vec<Vec<u8>>>>>,
 }
 
 /// Configuration knobs for the runtime tasks. Defaults are tuned for
@@ -463,6 +515,78 @@ impl LatticeRuntime {
         }
         Ok(())
     }
+
+    /// P2.6-B.4a: receive handler for the batch-broadcast topic.
+    ///
+    /// Steps:
+    ///   1. Deserialize the envelope (drop on parse error).
+    ///   2. Drop if the envelope's group_id does not match this LN's
+    ///      current group (cross-group leakage protection).
+    ///   3. Recompute `compute_batch_root_v2` from `sig_hashes` and
+    ///      the envelope's (round, group_id, author) tuple — drop on
+    ///      mismatch.
+    ///   4. Insert `raw_bytes` into batch_cache under `cell_id`.
+    pub async fn process_batch_message(
+        state: &LatticeRuntimeState,
+        local_group_id: Option<&str>,
+        data: &[u8],
+    ) -> anyhow::Result<()> {
+        let envelope: BatchEnvelope = match serde_json::from_slice(data) {
+            Ok(e) => e,
+            Err(e) => {
+                debug!(error = %e, "Lattice batch: failed to deserialize envelope, ignoring");
+                return Ok(());
+            }
+        };
+
+        if let Some(lg) = local_group_id {
+            if lg != envelope.group_id {
+                debug!(
+                    target: "savitri::lattice",
+                    local = %lg,
+                    envelope_group = %envelope.group_id,
+                    "Lattice batch: cross-group envelope dropped"
+                );
+                return Ok(());
+            }
+        }
+
+        let expected = compute_batch_root_v2(
+            envelope.round,
+            &envelope.group_id,
+            &envelope.author,
+            &envelope.sig_hashes,
+        );
+        if expected != envelope.batch_root {
+            warn!(
+                target: "savitri::lattice",
+                "Lattice batch: batch_root mismatch, dropping envelope"
+            );
+            return Ok(());
+        }
+
+        if envelope.sig_hashes.len() != envelope.raw_bytes.len() {
+            warn!(
+                target: "savitri::lattice",
+                sig_count = envelope.sig_hashes.len(),
+                byte_count = envelope.raw_bytes.len(),
+                "Lattice batch: envelope length mismatch, dropping"
+            );
+            return Ok(());
+        }
+
+        {
+            let mut cache = state.batch_cache.write().await;
+            cache.insert(envelope.cell_id, envelope.raw_bytes);
+        }
+        debug!(
+            target: "savitri::lattice",
+            author = %envelope.author,
+            sig_count = envelope.sig_hashes.len(),
+            "Lattice batch: envelope accepted, cached"
+        );
+        Ok(())
+    }
 }
 
 /// Inner loop: publisher.
@@ -519,26 +643,42 @@ where
         // Build + sign the cell. batch_root is a placeholder until the
         // Lattice data-availability layer ships (Phase 2.6+).
         let author_pubkey = state.signing_key.verifying_key().to_bytes();
-        // P2.6-B.2 + P2.6-B.3: peek up to tx_per_cell_cap from the
-        // mempool (non-destructive), derive a content-addressing
-        // batch_root, and stash the peeked TX so the chain hook can
-        // recover them at commit time.
+        // P2.6-B.2 + P2.6-B.3 + P2.6-B.4a: peek up to tx_per_cell_cap
+        // from the mempool (non-destructive), derive a
+        // content-addressing batch_root, and capture (sig_hashes,
+        // raw_bytes) pairs for the BatchEnvelope broadcast.
         let cap = state.tx_per_cell_cap;
-        let (batch_root, peeked_for_cache): (BatchRoot, Vec<savitri_mempool::mempool::types::MempoolTx>) =
+        let (batch_root, peeked_sigs, peeked_bytes): (BatchRoot, Vec<[u8; 32]>, Vec<Vec<u8>>) =
             if cap > 0 {
                 if let Some(mempool) = state.mempool_handle.as_ref() {
-                    let peeked = mempool.peek_pending(cap);
+                    let peeked = mempool.peek_pending_with_bytes(cap);
                     if peeked.is_empty() {
-                        (compute_dynamic_batch_root(round, &group_id, &state.local_peer_id), Vec::new())
+                        (
+                            compute_dynamic_batch_root(round, &group_id, &state.local_peer_id),
+                            Vec::new(),
+                            Vec::new(),
+                        )
                     } else {
-                        let root = compute_batch_root_from_txs(round, &group_id, &state.local_peer_id, &peeked);
-                        (root, peeked)
+                        let sigs: Vec<[u8; 32]> =
+                            peeked.iter().map(|(tx, _)| tx.signature_hash).collect();
+                        let bytes: Vec<Vec<u8>> =
+                            peeked.into_iter().map(|(_, b)| b).collect();
+                        let root = compute_batch_root_v2(round, &group_id, &state.local_peer_id, &sigs);
+                        (root, sigs, bytes)
                     }
                 } else {
-                    (compute_dynamic_batch_root(round, &group_id, &state.local_peer_id), Vec::new())
+                    (
+                        compute_dynamic_batch_root(round, &group_id, &state.local_peer_id),
+                        Vec::new(),
+                        Vec::new(),
+                    )
                 }
             } else {
-                (compute_dynamic_batch_root(round, &group_id, &state.local_peer_id), Vec::new())
+                (
+                    compute_dynamic_batch_root(round, &group_id, &state.local_peer_id),
+                    Vec::new(),
+                    Vec::new(),
+                )
             };
         let mut cell = LatticeCell::with_sorted_parents(
             round,
@@ -573,13 +713,42 @@ where
         // so the author contributes to the 2f+1 quorum. Without
         // this, with 2 LN/group, certified=0 forever (see DIAG
         // snapshot from the 2026-05-12 observation run).
-        // P2.6-B.3: now that cell_id is known, stash the peeked TX
-        // batch keyed by cell_id. Only inserted when we actually peeked
-        // a non-empty batch (V2 path); skipped on V1 fallback to keep
-        // memory bounded.
-        if !peeked_for_cache.is_empty() {
-            let mut cache = state.batch_cache.write().await;
-            cache.insert(cell_id, peeked_for_cache);
+        // P2.6-B.3 + P2.6-B.4a: stash the peeked raw signed bytes
+        // keyed by cell_id (own-authored entry) AND broadcast a
+        // BatchEnvelope on the batch topic so co-grouped peers can
+        // populate their own caches. Both skipped on V1 fallback.
+        if !peeked_bytes.is_empty() {
+            {
+                let mut cache = state.batch_cache.write().await;
+                cache.insert(cell_id, peeked_bytes.clone());
+            }
+            let envelope = BatchEnvelope {
+                cell_id,
+                batch_root,
+                round,
+                group_id: group_id.clone(),
+                author: state.local_peer_id.clone(),
+                sig_hashes: peeked_sigs,
+                raw_bytes: peeked_bytes,
+            };
+            match serde_json::to_vec(&envelope) {
+                Ok(buf) => {
+                    let topic = batch_topic_for_group(&group_id);
+                    if state.network_publish_tx.send((topic, buf)).await.is_err() {
+                        debug!(
+                            target: "savitri::lattice",
+                            "publisher: batch envelope channel closed, skipping"
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        target: "savitri::lattice",
+                        error = %e,
+                        "publisher: BatchEnvelope serialize failed"
+                    );
+                }
+            }
         }
         publish_attestation(&state, cell_id, &cell).await;
 
@@ -881,14 +1050,14 @@ fn compute_dynamic_batch_root(
 ///   - the cell wire stays small while still committing to the batch
 ///     content (the side-channel storage layer in P2.6-B.3 will keep
 ///     the full TXs keyed by this digest).
-fn compute_batch_root_from_txs(
+fn compute_batch_root_v2(
     round: LatticeRound,
     group_id: &str,
     peer_id: &str,
-    txs: &[savitri_mempool::mempool::types::MempoolTx],
+    sig_hashes: &[[u8; 32]],
 ) -> BatchRoot {
     let mut buf =
-        Vec::with_capacity(64 + group_id.len() + peer_id.len() + txs.len() * 32);
+        Vec::with_capacity(64 + group_id.len() + peer_id.len() + sig_hashes.len() * 32);
     buf.extend_from_slice(b"SAVITRI-LATTICE-BATCH-ROOT-V2\0");
     buf.extend_from_slice(&round.to_be_bytes());
     buf.push(0);
@@ -896,11 +1065,24 @@ fn compute_batch_root_from_txs(
     buf.push(0);
     buf.extend_from_slice(peer_id.as_bytes());
     buf.push(0);
-    buf.extend_from_slice(&(txs.len() as u32).to_be_bytes());
-    for tx in txs {
-        buf.extend_from_slice(&tx.signature_hash);
+    buf.extend_from_slice(&(sig_hashes.len() as u32).to_be_bytes());
+    for h in sig_hashes {
+        buf.extend_from_slice(h);
     }
     savitri_core::crypto::hash::hash(&buf)
+}
+
+/// P2.6-B.2 publisher-side convenience: derive batch_root from
+/// MempoolTx values by extracting their signature_hash and forwarding
+/// to compute_batch_root_v2.
+fn compute_batch_root_from_txs(
+    round: LatticeRound,
+    group_id: &str,
+    peer_id: &str,
+    txs: &[savitri_mempool::mempool::types::MempoolTx],
+) -> BatchRoot {
+    let sigs: Vec<[u8; 32]> = txs.iter().map(|t| t.signature_hash).collect();
+    compute_batch_root_v2(round, group_id, peer_id, &sigs)
 }
 
 #[cfg(test)]

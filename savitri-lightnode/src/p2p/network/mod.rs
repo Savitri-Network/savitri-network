@@ -2662,6 +2662,8 @@ pub async fn start_network(
                                                     crate::lattice_runtime::cell_topic_for_group(&local_gid_str).hash();
                                                 let att_topic_hash =
                                                     crate::lattice_runtime::attestation_topic_for_group(&local_gid_str).hash();
+                                                let batch_topic_hash =
+                                                    crate::lattice_runtime::batch_topic_for_group(&local_gid_str).hash();
                                                 let rt_state = lattice_runtime_state.clone();
                                                 let data = message.data.clone();
                                                 if message.topic == cell_topic_hash {
@@ -2674,6 +2676,12 @@ pub async fn start_network(
                                                     tokio::spawn(async move {
                                                         if let Err(e) = crate::lattice_runtime::LatticeRuntime::process_attestation_message(&rt_state, local_gid.as_deref(), &data).await {
                                                             tracing::warn!(error = ?e, "lattice_attestation: process failed");
+                                                        }
+                                                    });
+                                                } else if message.topic == batch_topic_hash {
+                                                    tokio::spawn(async move {
+                                                        if let Err(e) = crate::lattice_runtime::LatticeRuntime::process_batch_message(&rt_state, local_gid.as_deref(), &data).await {
+                                                            tracing::warn!(error = ?e, "lattice_batch: process failed");
                                                         }
                                                     });
                                                 }
@@ -5077,6 +5085,7 @@ pub async fn start_network(
                             // V0.2 Phase 2 (Lattice ordering, issue #32)
                             (crate::lattice_runtime::cell_topic_for_group(&group_id_str), "lattice_cell"),
                             (crate::lattice_runtime::attestation_topic_for_group(&group_id_str), "lattice_attestation"),
+                            (crate::lattice_runtime::batch_topic_for_group(&group_id_str), "lattice_batch"),
                             (intra_group_proposal_topic.clone(), "proposal"),
                             (intra_group_vote_topic.clone(), "vote"),
                         ] {

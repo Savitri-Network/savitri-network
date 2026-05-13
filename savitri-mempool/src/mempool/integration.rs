@@ -1933,6 +1933,30 @@ impl MempoolPipeline {
         }
     }
 
+    /// P2.6-B.4a: peek up to `max` pending TX and resolve each to its
+    /// raw signed bytes via the tx_storage lookup. Returns pairs of
+    /// (MempoolTx, raw bytes) so callers (e.g. the Lattice publisher)
+    /// can:
+    ///   - use signature_hash from MempoolTx to compute the batch_root
+    ///     (replay-resistant content commitment), and
+    ///   - ship the raw signed bytes side-band so co-grouped peers can
+    ///     reconstruct the batch when a cycle commits without having
+    ///     to drain their own mempool.
+    ///
+    /// TX whose handle is missing from tx_storage (race / TTL purge)
+    /// are silently skipped so the caller never sees a placeholder.
+    pub fn peek_pending_with_bytes(&self, max: usize) -> Vec<(MempoolTx, Vec<u8>)> {
+        let txs = self.peek_pending(max);
+        let bytes = get_tx_bytes_from_handles(
+            &self.tx_storage,
+            &txs.iter().map(|t| t.tx_handle).collect::<Vec<_>>(),
+        );
+        txs.into_iter()
+            .zip(bytes.into_iter())
+            .filter_map(|(tx, b)| b.map(|raw| (tx, raw)))
+            .collect()
+    }
+
     /// Check if mempool is empty
     ///
     /// # Error Handling
