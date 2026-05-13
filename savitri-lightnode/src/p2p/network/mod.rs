@@ -532,13 +532,29 @@ pub async fn start_network(
     // we keep a clone of the Arc<LatticeRuntimeState> so the gossipsub
     // receive branch can call the static process_*_message helpers
     // without going through the owning value.
-    let lattice_runtime = crate::lattice_runtime::LatticeRuntime::new(
+    let mut lattice_runtime = crate::lattice_runtime::LatticeRuntime::new(
         local_node_id.clone(),
         signing_key.clone(),
         intra_publish_tx_clone_for_lattice.clone(),
         crate::lattice_runtime::LatticeRuntimeConfig::default(),
         mempool_pipeline.as_ref().map(|p| p.inner_for_rpc()),
     );
+
+    // P2.6-C.2 Phase A: shadow chain consumer wiring.
+    //   - bounded mpsc channel for CommittedLatticeBlock values.
+    //   - set_chain_sink BEFORE spawn_tasks so Arc::get_mut works.
+    //   - spawn lattice_chain_consumer_loop on the receiver. Writes
+    //     a JSONL audit file when SAVITRI_LATTICE_SHADOW_AUDIT is set;
+    //     otherwise idles waiting for messages that never come.
+    let (chain_sink_tx, chain_sink_rx) =
+        tokio::sync::mpsc::channel::<crate::lattice_runtime::CommittedLatticeBlock>(64);
+    if !lattice_runtime.set_chain_sink(chain_sink_tx) {
+        tracing::warn!(
+            "P2.6-C.2: set_chain_sink failed (Arc already cloned) - shadow consumer will not receive blocks"
+        );
+    }
+    tokio::spawn(crate::lattice_runtime::lattice_chain_consumer_loop(chain_sink_rx));
+
     let lattice_runtime_state = lattice_runtime.state();
     {
         let gm_for_provider = group_manager.clone();

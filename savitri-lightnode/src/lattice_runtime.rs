@@ -145,6 +145,39 @@ pub fn is_authoritative_mode() -> bool {
         .unwrap_or(false)
 }
 
+/// P2.6-C.2 Phase A: env var that turns ON the shadow chain consumer
+/// (audit-only mode). When set to a truthy value AND a `chain_sink`
+/// is wired, the commit_poller_loop forwards every CommittedLatticeBlock
+/// to the consumer task. The consumer writes a JSONL audit file but
+/// does NOT touch the V0.1 chain — safe to enable in production-like
+/// observation runs.
+///
+/// Independent from CONSENSUS_VERSION_ENV: shadow audit can be ON
+/// while authoritative mode is OFF (the intended combo for offline
+/// validation of the chain hook before the flag-day cutover).
+pub const SHADOW_AUDIT_ENV: &str = "SAVITRI_LATTICE_SHADOW_AUDIT";
+
+/// P2.6-C.2 Phase A: env var that lets operators override the audit
+/// file path. Default `/host-state/lattice-blocks.jsonl` matches the
+/// container bind-mount layout (visible on the host as
+/// `/opt/savitri/lattice-blocks.jsonl`).
+pub const SHADOW_AUDIT_FILE_ENV: &str = "SAVITRI_LATTICE_AUDIT_FILE";
+
+#[inline]
+pub fn is_shadow_audit_mode() -> bool {
+    std::env::var(SHADOW_AUDIT_ENV)
+        .map(|v| matches!(v.trim(), "1" | "true" | "TRUE" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+#[inline]
+pub fn shadow_audit_file_path() -> std::path::PathBuf {
+    std::env::var(SHADOW_AUDIT_FILE_ENV)
+        .ok()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from("/host-state/lattice-blocks.jsonl"))
+}
+
 /// P2.6-B.4a: wire-format envelope for the batch broadcast topic.
 ///
 /// Published alongside each LatticeCell that contains a non-empty
@@ -965,11 +998,13 @@ async fn commit_poller_loop<F>(
                         .set(merged.len() as f64);
                     }
 
-                    // P2.6-C.1: forward to chain sink in authoritative
-                    // mode. Best-effort send — if the chain consumer
-                    // dropped its receiver we log and continue (it can
-                    // catch up later via persistence in P2.6-D).
-                    if is_authoritative_mode() {
+                    // P2.6-C.1 + P2.6-C.2 Phase A: forward to chain sink
+                    // when either authoritative mode is on (v2) OR the
+                    // shadow audit mode is on. Best-effort send — if
+                    // the chain consumer dropped its receiver we log
+                    // and continue (it can catch up later via
+                    // persistence in P2.6-D).
+                    if is_authoritative_mode() || is_shadow_audit_mode() {
                         if let Some(sink) = state.chain_sink.as_ref() {
                             let block = CommittedLatticeBlock {
                                 cycle_index: cy.index,
@@ -1217,6 +1252,109 @@ fn compute_batch_root_from_txs(
 ) -> BatchRoot {
     let sigs: Vec<[u8; 32]> = txs.iter().map(|t| t.signature_hash).collect();
     compute_batch_root_v2(round, group_id, peer_id, &sigs)
+}
+
+/// P2.6-C.2 Phase A: shadow-mode consumer that drains
+/// CommittedLatticeBlock values from the channel and writes one
+/// JSONL line per block to the audit file. Designed for
+/// observation-only mode — does NOT touch the V0.1 chain.
+///
+/// Each line carries the metrics needed to:
+///   - confirm the chain hook fired (cycle, group, pivot);
+///   - measure batch reconstruction success (hits/misses ratio);
+///   - estimate per-cycle TX throughput (tx_count, total_bytes_len);
+///   - correlate across LNs by cycle_index + group_id.
+///
+/// Best-effort writes: if the file cannot be opened or a line write
+/// fails, the consumer logs the error and continues — the channel
+/// is never blocked, so the commit_poller_loop is never throttled
+/// by audit I/O.
+pub async fn lattice_chain_consumer_loop(
+    mut rx: tokio::sync::mpsc::Receiver<CommittedLatticeBlock>,
+) {
+    use tokio::io::AsyncWriteExt;
+
+    let path = shadow_audit_file_path();
+    info!(
+        target: "savitri::lattice",
+        path = %path.display(),
+        "P2.6-C.2 shadow consumer: starting"
+    );
+
+    let mut total_blocks: u64 = 0;
+    let mut total_misses: u64 = 0;
+    let mut total_hits: u64 = 0;
+
+    while let Some(block) = rx.recv().await {
+        total_blocks += 1;
+        total_hits += block.batch_hits as u64;
+        total_misses += block.batch_misses as u64;
+
+        // Build a single JSONL line. Use a hand-rolled JSON to avoid
+        // an extra serde derive on CommittedLatticeBlock (which would
+        // pull merged_tx_bytes serialization into the audit file — not
+        // wanted; we only want metadata here).
+        let ts_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        let line = format!(
+            "{{\"ts_ms\":{},\"cycle\":{},\"group\":{:?},\"pivot\":{:?},\"cell_count\":{},\"batch_hits\":{},\"batch_misses\":{},\"tx_count\":{},\"bytes\":{}}}\n",
+            ts_ms,
+            block.cycle_index,
+            block.group_id,
+            block.pivot,
+            block.committed_cells.len(),
+            block.batch_hits,
+            block.batch_misses,
+            block.merged_tx_bytes.len(),
+            block.total_tx_bytes_len,
+        );
+
+        match tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .await
+        {
+            Ok(mut f) => {
+                if let Err(e) = f.write_all(line.as_bytes()).await {
+                    warn!(
+                        target: "savitri::lattice",
+                        error = %e,
+                        path = %path.display(),
+                        "shadow consumer: write_all failed"
+                    );
+                }
+            }
+            Err(e) => {
+                warn!(
+                    target: "savitri::lattice",
+                    error = %e,
+                    path = %path.display(),
+                    "shadow consumer: cannot open audit file"
+                );
+            }
+        }
+
+        if total_blocks % 50 == 0 {
+            info!(
+                target: "savitri::lattice",
+                total_blocks,
+                total_hits,
+                total_misses,
+                "DIAG[lattice-audit] shadow consumer rolling stats"
+            );
+        }
+    }
+
+    info!(
+        target: "savitri::lattice",
+        total_blocks,
+        total_hits,
+        total_misses,
+        "P2.6-C.2 shadow consumer: channel closed, exiting"
+    );
 }
 
 #[cfg(test)]
