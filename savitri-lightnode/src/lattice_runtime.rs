@@ -491,6 +491,12 @@ where
             }
         };
 
+        // Phase 2.5 fix: emit our own attestation on our own cell
+        // so the author contributes to the 2f+1 quorum. Without
+        // this, with 2 LN/group, certified=0 forever (see DIAG
+        // snapshot from the 2026-05-12 observation run).
+        publish_attestation(&state, cell_id, &cell).await;
+
         // Serialize + publish.
         let encoded = match serde_json::to_vec(&cell) {
             Ok(v) => v,
@@ -600,12 +606,19 @@ async fn commit_poller_loop<F>(
                         "outcome" => "anchor_missing"
                     )
                     .increment(1);
+                    info!(
+                        target: "savitri::lattice",
+                        cycle,
+                        anchor_round = cycle * 2,
+                        pivot = %pivot,
+                        "DIAG[lattice-commit-decision] AnchorNotCertified"
+                    );
                     // Stop attempting further cycles — once a cycle
                     // is blocked, later cycles are blocked too (their
                     // anchor depends on the same DAG).
                     break;
                 }
-                CommitDecision::BelowFollowerQuorum { .. } => {
+                CommitDecision::BelowFollowerQuorum { follower_count, quorum } => {
                     #[cfg(feature = "metrics")]
                     counter!(
                         "lattice_commit_decisions_total",
@@ -613,6 +626,16 @@ async fn commit_poller_loop<F>(
                         "outcome" => "below_follower_quorum"
                     )
                     .increment(1);
+                    info!(
+                        target: "savitri::lattice",
+                        cycle,
+                        anchor_round = cycle * 2,
+                        follow_round = cycle * 2 + 1,
+                        pivot = %pivot,
+                        follower_count,
+                        quorum,
+                        "DIAG[lattice-commit-decision] BelowFollowerQuorum"
+                    );
                     break;
                 }
             }
