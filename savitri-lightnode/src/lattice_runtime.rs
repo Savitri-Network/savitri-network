@@ -553,8 +553,17 @@ async fn commit_poller_loop<F>(
         // Attempt every uncommitted cycle from last_committed+1 up to
         // current_cycle - 1 (commit cycle k requires having round
         // 2k+1 cells, i.e. we are at round >= 2k+1).
+        //
+        // P2.6-A fix: when there is no last_committed_cycle yet (cold
+        // start), do NOT scan from cycle 0 — the wall-clock-derived
+        // cycle index is ~0.9 billion. Start from current_cycle minus a
+        // small lookback window so the first probe lands inside the
+        // aggregator retention window (64 rounds / 32 cycles).
+        const COMMIT_LOOKBACK_CYCLES: u64 = 32;
         let max_attempt_cycle = current_cycle.saturating_sub(1);
-        let start_cycle = last_committed_cycle.map(|c| c + 1).unwrap_or(0);
+        let start_cycle = last_committed_cycle
+            .map(|c| c + 1)
+            .unwrap_or_else(|| current_cycle.saturating_sub(COMMIT_LOOKBACK_CYCLES));
 
         for cycle in start_cycle..=max_attempt_cycle {
             let pivot =
