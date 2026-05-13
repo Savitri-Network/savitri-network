@@ -1,0 +1,93 @@
+{
+    "name": "Savitri Network",
+    "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest",
+            "dockerDashComposeVersion": "v2",
+            "moby": true
+        },
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": true,
+            "configureZshAsDefaultShell": false,
+            "upgradePackages": false
+        }
+    },
+
+    "forwardPorts": [
+        8545, 8546, 8547, 8548, 8549,
+        5001, 5002, 5003, 5004, 5005,
+        5021, 5022, 5023, 5024, 5025,
+        9090, 3000
+    ],
+
+    "portsAttributes": {
+        "8545": { "label": "JSON-RPC (LN-1)", "onAutoForward": "notify" },
+        "8546": { "label": "JSON-RPC (LN-2)", "onAutoForward": "silent" },
+        "8547": { "label": "JSON-RPC (LN-3)", "onAutoForward": "silent" },
+        "8548": { "label": "JSON-RPC (LN-4)", "onAutoForward": "silent" },
+        "8549": { "label": "JSON-RPC (LN-5)", "onAutoForward": "silent" },
+        "5001": { "label": "Lightnode P2P (1)", "onAutoForward": "silent" },
+        "5021": { "label": "Masternode P2P (1)", "onAutoForward": "silent" },
+        "9090": { "label": "Prometheus", "onAutoForward": "openBrowser" },
+        "3000": { "label": "Grafana (admin/admin)", "onAutoForward": "openBrowser" }
+    },
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "vadimcn.vscode-lldb",
+                "tamasfe.even-better-toml",
+                "fill-labs.dependi",
+                "usernamehw.errorlens",
+                "ms-azuretools.vscode-docker",
+                "github.vscode-pull-request-github",
+                "github.vscode-github-actions",
+                "redhat.vscode-yaml"
+            ],
+            "settings": {
+                "rust-analyzer.check.command": "clippy",
+                "rust-analyzer.check.allTargets": true,
+                "rust-analyzer.cargo.features": "all",
+                "rust-analyzer.cargo.buildScripts.enable": true,
+                "rust-analyzer.procMacro.enable": true,
+                "editor.formatOnSave": true,
+                "editor.rulers": [100],
+                "[rust]": {
+                    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+                    "editor.formatOnSave": true
+                },
+                "files.watcherExclude": {
+                    "**/target/**": true,
+                    "**/.git/**": true
+                },
+                "terminal.integrated.defaultProfile.linux": "bash"
+            }
+        }
+    },
+
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+    "remoteUser": "vscode",
+
+    "containerEnv": {
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_TERM_COLOR": "always",
+        "RUST_BACKTRACE": "1"
+    },
+
+    "mounts": [
+        "source=savitri-cargo-registry,target=/usr/local/cargo/registry,type=volume",
+        "source=savitri-cargo-git,target=/usr/local/cargo/git,type=volume",
+        "source=savitri-target,target=${containerWorkspaceFolder}/target,type=volume"
+    ],
+
+    "hostRequirements": {
+        "cpus": 4,
+        "memory": "8gb",
+        "storage": "32gb"
+    }
+}
