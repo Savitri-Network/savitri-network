@@ -158,6 +158,17 @@ pub struct LatticeRuntimeState {
     /// P2.6-B.2: cached cap for the publisher (mirrors config to avoid
     /// crossing the runtime->state boundary inside the loop).
     pub tx_per_cell_cap: usize,
+    /// P2.6-B.3: local cache of (cell_id -> peeked TX batch) for cells
+    /// authored by THIS lightnode. Used by the chain hook (P2.6-C) to
+    /// recover the TX content of a committed cycle. Bounded by retention
+    /// window — entries are evicted on commit_poller tick after the
+    /// matching certified cell ages out of the aggregator.
+    ///
+    /// Only contains own-authored entries (we peek the local mempool,
+    /// not anyone else's). P2.6-B.4 will add a side-channel for peers
+    /// to fetch batches by `batch_root` if the local cache miss occurs
+    /// during commit.
+    pub batch_cache: Arc<RwLock<std::collections::BTreeMap<CellId, Vec<savitri_mempool::mempool::types::MempoolTx>>>>,
 }
 
 /// Configuration knobs for the runtime tasks. Defaults are tuned for
@@ -225,6 +236,7 @@ impl LatticeRuntime {
             config.aggregator.clone(),
         )));
         let tx_per_cell_cap = config.tx_per_cell_cap;
+        let batch_cache = Arc::new(RwLock::new(std::collections::BTreeMap::new()));
         let state = Arc::new(LatticeRuntimeState {
             local_peer_id,
             signing_key,
@@ -232,6 +244,7 @@ impl LatticeRuntime {
             network_publish_tx,
             mempool_handle,
             tx_per_cell_cap,
+            batch_cache,
         });
         Self { state, config }
     }
@@ -506,25 +519,27 @@ where
         // Build + sign the cell. batch_root is a placeholder until the
         // Lattice data-availability layer ships (Phase 2.6+).
         let author_pubkey = state.signing_key.verifying_key().to_bytes();
-        // P2.6-B.2: peek up to tx_per_cell_cap from the mempool
-        // (non-destructive) and derive a content-addressing batch_root.
-        // Falls back to the dynamic placeholder when the handle is
-        // missing or the cap is 0.
+        // P2.6-B.2 + P2.6-B.3: peek up to tx_per_cell_cap from the
+        // mempool (non-destructive), derive a content-addressing
+        // batch_root, and stash the peeked TX so the chain hook can
+        // recover them at commit time.
         let cap = state.tx_per_cell_cap;
-        let batch_root: BatchRoot = if cap > 0 {
-            if let Some(mempool) = state.mempool_handle.as_ref() {
-                let peeked = mempool.peek_pending(cap);
-                if peeked.is_empty() {
-                    compute_dynamic_batch_root(round, &group_id, &state.local_peer_id)
+        let (batch_root, peeked_for_cache): (BatchRoot, Vec<savitri_mempool::mempool::types::MempoolTx>) =
+            if cap > 0 {
+                if let Some(mempool) = state.mempool_handle.as_ref() {
+                    let peeked = mempool.peek_pending(cap);
+                    if peeked.is_empty() {
+                        (compute_dynamic_batch_root(round, &group_id, &state.local_peer_id), Vec::new())
+                    } else {
+                        let root = compute_batch_root_from_txs(round, &group_id, &state.local_peer_id, &peeked);
+                        (root, peeked)
+                    }
                 } else {
-                    compute_batch_root_from_txs(round, &group_id, &state.local_peer_id, &peeked)
+                    (compute_dynamic_batch_root(round, &group_id, &state.local_peer_id), Vec::new())
                 }
             } else {
-                compute_dynamic_batch_root(round, &group_id, &state.local_peer_id)
-            }
-        } else {
-            compute_dynamic_batch_root(round, &group_id, &state.local_peer_id)
-        };
+                (compute_dynamic_batch_root(round, &group_id, &state.local_peer_id), Vec::new())
+            };
         let mut cell = LatticeCell::with_sorted_parents(
             round,
             group_id.clone(),
@@ -537,6 +552,9 @@ where
         let payload = cell.signable_bytes();
         cell.author_signature = state.signing_key.sign(&payload).to_bytes();
 
+        // P2.6-B.3: stash own peeked TX batch under the (future) cell_id.
+        // We need cell_id which becomes available after observe_cell;
+        // we'll insert into batch_cache once we have it (see below).
         // Push into our own aggregator so we have the cell available
         // for our own attestation (LN attests its own cell as
         // author).
@@ -555,6 +573,14 @@ where
         // so the author contributes to the 2f+1 quorum. Without
         // this, with 2 LN/group, certified=0 forever (see DIAG
         // snapshot from the 2026-05-12 observation run).
+        // P2.6-B.3: now that cell_id is known, stash the peeked TX
+        // batch keyed by cell_id. Only inserted when we actually peeked
+        // a non-empty batch (V2 path); skipped on V1 fallback to keep
+        // memory bounded.
+        if !peeked_for_cache.is_empty() {
+            let mut cache = state.batch_cache.write().await;
+            cache.insert(cell_id, peeked_for_cache);
+        }
         publish_attestation(&state, cell_id, &cell).await;
 
         // Serialize + publish.
@@ -722,6 +748,7 @@ async fn commit_poller_loop<F>(
             let agg = state.aggregator.read().await;
             (agg.pending_count(), agg.certified_count())
         };
+        let batch_cache_size = state.batch_cache.read().await.len();
         #[cfg(feature = "metrics")]
         {
             gauge!("lattice_pending_cells", "group" => group_id.clone()).set(pending_count as f64);
@@ -736,14 +763,26 @@ async fn commit_poller_loop<F>(
             pending = pending_count,
             certified = certified_count,
             last_cycle = last_committed_cycle.unwrap_or(0),
+            batch_cache = batch_cache_size,
             "DIAG[lattice] aggregator state snapshot"
         );
 
-        // GC old cells.
+        // GC old cells. Also prune batch_cache entries whose cell is no
+        // longer present in the aggregator (P2.6-B.3 bounded retention).
         let evicted = {
             let mut agg = state.aggregator.write().await;
             agg.gc_old_cells()
         };
+        if evicted > 0 {
+            // Collect surviving certified cell IDs and intersect with cache.
+            let agg = state.aggregator.read().await;
+            let alive: std::collections::BTreeSet<CellId> = (0..=agg.high_water_round())
+                .flat_map(|r| agg.certified_at_round(r).map(|c| c.cell_id()))
+                .collect();
+            drop(agg);
+            let mut cache = state.batch_cache.write().await;
+            cache.retain(|cid, _| alive.contains(cid));
+        }
         if evicted > 0 {
             debug!(
                 target: "savitri::lattice",
