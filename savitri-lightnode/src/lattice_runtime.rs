@@ -150,6 +150,14 @@ pub struct LatticeRuntimeState {
     pub aggregator: Arc<RwLock<LatticeAggregator>>,
     /// Channel into the libp2p task for publishing on gossipsub.
     pub network_publish_tx: mpsc::Sender<(IdentTopic, Vec<u8>)>,
+    /// P2.6-B.2: optional mempool handle for peeking TX into batch_root.
+    /// When None (or tx_per_cell_cap=0), the publisher falls back to
+    /// the dynamic placeholder batch_root (P2.6-B.1).
+    pub mempool_handle:
+        Option<std::sync::Arc<savitri_mempool::mempool::integration::MempoolPipeline>>,
+    /// P2.6-B.2: cached cap for the publisher (mirrors config to avoid
+    /// crossing the runtime->state boundary inside the loop).
+    pub tx_per_cell_cap: usize,
 }
 
 /// Configuration knobs for the runtime tasks. Defaults are tuned for
@@ -163,15 +171,28 @@ pub struct LatticeRuntimeConfig {
     /// How often the commit poller attempts to commit the next cycle.
     /// Defaults to `2 * publish_interval_secs` (one cycle = two rounds).
     pub commit_poll_interval_secs: u64,
+    /// P2.6-B.2: max number of mempool TX peeked per published cell.
+    /// When the mempool handle is wired, the publisher peeks up to this
+    /// many pending TX (non-destructive) and folds their signature
+    /// hashes into the cell batch_root. Override via env
+    /// SAVITRI_LATTICE_TX_PER_CELL. Default 200 keeps cluster-wide
+    /// drain rate well below mempool cap. Set to 0 to disable mempool
+    /// integration (fall back to the dynamic placeholder batch_root).
+    pub tx_per_cell_cap: usize,
     /// Aggregator configuration (group size, retention, etc.).
     pub aggregator: AggregatorConfig,
 }
 
 impl Default for LatticeRuntimeConfig {
     fn default() -> Self {
+        let tx_per_cell_cap = std::env::var("SAVITRI_LATTICE_TX_PER_CELL")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(200);
         Self {
             publish_interval_secs: LATTICE_ROUND_DURATION_SECS,
             commit_poll_interval_secs: LATTICE_ROUND_DURATION_SECS,
+            tx_per_cell_cap,
             aggregator: AggregatorConfig::default(),
         }
     }
@@ -196,15 +217,21 @@ impl LatticeRuntime {
         signing_key: Arc<Keypair>,
         network_publish_tx: mpsc::Sender<(IdentTopic, Vec<u8>)>,
         config: LatticeRuntimeConfig,
+        mempool_handle: Option<
+            std::sync::Arc<savitri_mempool::mempool::integration::MempoolPipeline>,
+        >,
     ) -> Self {
         let aggregator = Arc::new(RwLock::new(LatticeAggregator::new(
             config.aggregator.clone(),
         )));
+        let tx_per_cell_cap = config.tx_per_cell_cap;
         let state = Arc::new(LatticeRuntimeState {
             local_peer_id,
             signing_key,
             aggregator,
             network_publish_tx,
+            mempool_handle,
+            tx_per_cell_cap,
         });
         Self { state, config }
     }
@@ -479,7 +506,25 @@ where
         // Build + sign the cell. batch_root is a placeholder until the
         // Lattice data-availability layer ships (Phase 2.6+).
         let author_pubkey = state.signing_key.verifying_key().to_bytes();
-        let batch_root: BatchRoot = compute_dynamic_batch_root(round, &group_id, &state.local_peer_id);
+        // P2.6-B.2: peek up to tx_per_cell_cap from the mempool
+        // (non-destructive) and derive a content-addressing batch_root.
+        // Falls back to the dynamic placeholder when the handle is
+        // missing or the cap is 0.
+        let cap = state.tx_per_cell_cap;
+        let batch_root: BatchRoot = if cap > 0 {
+            if let Some(mempool) = state.mempool_handle.as_ref() {
+                let peeked = mempool.peek_pending(cap);
+                if peeked.is_empty() {
+                    compute_dynamic_batch_root(round, &group_id, &state.local_peer_id)
+                } else {
+                    compute_batch_root_from_txs(round, &group_id, &state.local_peer_id, &peeked)
+                }
+            } else {
+                compute_dynamic_batch_root(round, &group_id, &state.local_peer_id)
+            }
+        } else {
+            compute_dynamic_batch_root(round, &group_id, &state.local_peer_id)
+        };
         let mut cell = LatticeCell::with_sorted_parents(
             round,
             group_id.clone(),
@@ -782,6 +827,40 @@ fn compute_dynamic_batch_root(
     buf.extend_from_slice(group_id.as_bytes());
     buf.push(0);
     buf.extend_from_slice(peer_id.as_bytes());
+    savitri_core::crypto::hash::hash(&buf)
+}
+
+
+/// P2.6-B.2: real batch_root derived from the mempool TX preview.
+/// Domain-separated SHA-256 over the cell author / round / cap /
+/// concatenated signature_hash of each peeked TX.
+///
+/// We hash signature_hash (32 bytes per TX, replay-resistant) rather
+/// than the raw serialized TX bytes because:
+///   - signature_hash is content-addressable and deterministic;
+///   - it is already computed at admission time (no extra serialization);
+///   - the cell wire stays small while still committing to the batch
+///     content (the side-channel storage layer in P2.6-B.3 will keep
+///     the full TXs keyed by this digest).
+fn compute_batch_root_from_txs(
+    round: LatticeRound,
+    group_id: &str,
+    peer_id: &str,
+    txs: &[savitri_mempool::mempool::types::MempoolTx],
+) -> BatchRoot {
+    let mut buf =
+        Vec::with_capacity(64 + group_id.len() + peer_id.len() + txs.len() * 32);
+    buf.extend_from_slice(b"SAVITRI-LATTICE-BATCH-ROOT-V2\0");
+    buf.extend_from_slice(&round.to_be_bytes());
+    buf.push(0);
+    buf.extend_from_slice(group_id.as_bytes());
+    buf.push(0);
+    buf.extend_from_slice(peer_id.as_bytes());
+    buf.push(0);
+    buf.extend_from_slice(&(txs.len() as u32).to_be_bytes());
+    for tx in txs {
+        buf.extend_from_slice(&tx.signature_hash);
+    }
     savitri_core::crypto::hash::hash(&buf)
 }
 

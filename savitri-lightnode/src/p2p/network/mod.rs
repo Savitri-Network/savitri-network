@@ -537,6 +537,7 @@ pub async fn start_network(
         signing_key.clone(),
         intra_publish_tx_clone_for_lattice.clone(),
         crate::lattice_runtime::LatticeRuntimeConfig::default(),
+        mempool_pipeline.as_ref().map(|p| p.inner_for_rpc()),
     );
     let lattice_runtime_state = lattice_runtime.state();
     {
