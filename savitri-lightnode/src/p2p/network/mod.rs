@@ -544,24 +544,68 @@ pub async fn start_network(
         let igc_for_provider = intra_group_comm.clone();
         lattice_runtime.spawn_tasks(move || {
             let g = gm_for_provider.get_current_group_cached()?;
-            // PoU ranking is whatever Phase 1 produces — read from the
-            // member_pou_scores cache on the IGC. We rank by score
-            // descending with peer_id ascending as canonical tiebreak,
-            // matching determine_proposer's logic exactly.
+            // A.5 (with graceful fallback): build ranked_pou by
+            // intersecting member_pou_scores with g.members. When
+            // g.members is non-empty (steady state), the filter
+            // restricts pivot election to peers that are actually in
+            // the current group, eliminating the cross-group misses
+            // that dominated AnchorNotCertified pre-A.5.
+            //
+            // When g.members is empty (cold-start or MN
+            // GroupAnnouncement not yet propagated), do NOT filter —
+            // fall back to the pre-A.5 behaviour so the closure
+            // continues to return a non-empty ranked vector and the
+            // publisher loop can keep producing cells. The brief
+            // window of cross-group misses during boot is far less
+            // costly than blocking the entire pipeline.
             let ranked: Vec<(String, u32)> = match igc_for_provider.try_read() {
-                Ok(igc) => {
-                    if let Ok(pou_map) = igc.member_pou_scores.try_read() {
-                        let mut v: Vec<(String, u32)> = pou_map
+                Ok(igc) => match igc.member_pou_scores.try_read() {
+                    Ok(pou_map) => {
+                        let mut v: Vec<(String, u32)> = if !g.members.is_empty() {
+                            let in_group: std::collections::HashSet<&str> =
+                                g.members.iter().map(|s| s.as_str()).collect();
+                            // Take all scored peers that are in the group,
+                            // then add members without a score yet (default 0).
+                            let mut acc: Vec<(String, u32)> = pou_map
+                                .iter()
+                                .filter(|(id, _)| in_group.contains(id.as_str()))
+                                .map(|(id, (score, _))| (id.clone(), *score))
+                                .collect();
+                            for m in &g.members {
+                                if !acc.iter().any(|(id, _)| id == m) {
+                                    acc.push((m.clone(), 0));
+                                }
+                            }
+                            acc
+                        } else {
+                            // Cold-start fallback: pre-A.5 behaviour
+                            pou_map
+                                .iter()
+                                .map(|(id, (score, _))| (id.clone(), *score))
+                                .collect()
+                        };
+                        v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                        v
+                    }
+                    Err(_) => {
+                        let mut v: Vec<(String, u32)> = g
+                            .members
                             .iter()
-                            .map(|(id, (score, _))| (id.clone(), *score))
+                            .map(|m| (m.clone(), 0u32))
                             .collect();
                         v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
                         v
-                    } else {
-                        Vec::new()
                     }
+                },
+                Err(_) => {
+                    let mut v: Vec<(String, u32)> = g
+                        .members
+                        .iter()
+                        .map(|m| (m.clone(), 0u32))
+                        .collect();
+                    v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                    v
                 }
-                Err(_) => Vec::new(),
             };
             Some((g.group_id, ranked))
         });
