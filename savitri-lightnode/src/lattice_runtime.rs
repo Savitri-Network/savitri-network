@@ -622,10 +622,13 @@ async fn commit_poller_loop<F>(
                         pivot = %pivot,
                         "DIAG[lattice-commit-decision] AnchorNotCertified"
                     );
-                    // Stop attempting further cycles — once a cycle
-                    // is blocked, later cycles are blocked too (their
-                    // anchor depends on the same DAG).
-                    break;
+                    // P2.6-A skip-ahead: with wall-clock cycles and
+                    // jittered attestation timing, individual cycles
+                    // may fail while later ones succeed. Continue
+                    // probing instead of breaking. walk_causal_history
+                    // on a later anchor will still include the parent
+                    // history transitively.
+                    continue;
                 }
                 CommitDecision::BelowFollowerQuorum { follower_count, quorum } => {
                     #[cfg(feature = "metrics")]
@@ -645,7 +648,9 @@ async fn commit_poller_loop<F>(
                         quorum,
                         "DIAG[lattice-commit-decision] BelowFollowerQuorum"
                     );
-                    break;
+                    // P2.6-A skip-ahead (same rationale as
+                    // AnchorNotCertified above).
+                    continue;
                 }
             }
         }
