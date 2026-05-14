@@ -1405,6 +1405,7 @@ fn compute_batch_root_from_txs(
 pub async fn lattice_chain_consumer_loop(
     mut rx: tokio::sync::mpsc::Receiver<CommittedLatticeBlock>,
     state: Arc<LatticeRuntimeState>,
+    chain_storage: Arc<dyn crate::storage::BlockAndAccountStorageTrait>,
 ) {
     use tokio::io::AsyncWriteExt;
 
@@ -1534,6 +1535,19 @@ pub async fn lattice_chain_consumer_loop(
         {
             let mut m = state.last_committed_block_hash.write().await;
             m.insert(block.group_id.clone(), block_hash);
+        }
+        // P2.6-D.1: persist the chain head synchronously so a
+        // restart restores the same parent_block_hash sequence. The
+        // write is 32 bytes per group, so the latency hit is
+        // negligible. Errors are logged at warn but do not abort
+        // the consumer — the in-memory map is still correct.
+        if let Err(e) = chain_storage.set_lattice_chain_head(&block.group_id, &block_hash) {
+            warn!(
+                target: "savitri::lattice",
+                error = %e,
+                group = %block.group_id,
+                "consumer: set_lattice_chain_head failed (in-memory still consistent)"
+            );
         }
         info!(
             target: "savitri::lattice",
