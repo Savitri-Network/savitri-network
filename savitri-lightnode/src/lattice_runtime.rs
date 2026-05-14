@@ -436,8 +436,26 @@ where
     // assignment settle.
     tick.tick().await;
 
+    // P2.6 diagnosis: track tick timing to surface scheduler/lock
+    // starvation under heavy V0.1 load.
+    let mut last_tick = std::time::Instant::now();
+    let mut tick_count: u64 = 0;
     loop {
         tick.tick().await;
+        let now = std::time::Instant::now();
+        let elapsed_ms = now.duration_since(last_tick).as_millis() as u64;
+        last_tick = now;
+        tick_count += 1;
+        // Log every 10 ticks (~20s with 2s interval) the actual elapsed
+        // time so we can spot when the loop is starved (elapsed >> 2000).
+        if tick_count % 10 == 0 {
+            info!(
+                target: "savitri::lattice",
+                tick_count,
+                elapsed_ms,
+                "DIAG[lattice-timing] publisher_loop tick interval"
+            );
+        }
         let Some((group_id, _ranked_pou)) = group_provider() else {
             debug!(target: "savitri::lattice", "publisher: no current group, skipping");
             continue;
@@ -534,8 +552,22 @@ async fn commit_poller_loop<F>(
     // re-attempting the same cycle every tick.
     let mut last_committed_cycle: Option<CycleIndex> = None;
 
+    let mut poller_last = std::time::Instant::now();
+    let mut poller_tick_count: u64 = 0;
     loop {
         tick.tick().await;
+        let now = std::time::Instant::now();
+        let poller_elapsed_ms = now.duration_since(poller_last).as_millis() as u64;
+        poller_last = now;
+        poller_tick_count += 1;
+        if poller_tick_count % 10 == 0 {
+            info!(
+                target: "savitri::lattice",
+                tick_count = poller_tick_count,
+                elapsed_ms = poller_elapsed_ms,
+                "DIAG[lattice-timing] commit_poller_loop tick interval"
+            );
+        }
         let Some((group_id, ranked_pou)) = group_provider() else {
             continue;
         };

@@ -69,7 +69,7 @@ use crate::types::lattice::CycleIndex;
 /// If the lightnode value changes, this constant MUST be updated in
 /// lockstep — otherwise pivot election diverges between LN and the
 /// commit walker.
-pub const PIVOT_TENURE_SLOTS: usize = 10;
+pub const PIVOT_TENURE_SLOTS: usize = 1;
 
 /// Elect the pivot for cycle `k` in group `group_id`.
 ///
