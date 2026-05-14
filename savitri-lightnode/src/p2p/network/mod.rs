@@ -558,28 +558,58 @@ pub async fn start_network(
     let lattice_runtime_state = lattice_runtime.state();
     {
         let gm_for_provider = group_manager.clone();
-        let igc_for_provider = intra_group_comm.clone();
+        let lcs_for_provider = latency_canon_state.clone();
         lattice_runtime.spawn_tasks(move || {
             let g = gm_for_provider.get_current_group_cached()?;
-            // PoU ranking is whatever Phase 1 produces — read from the
-            // member_pou_scores cache on the IGC. We rank by score
-            // descending with peer_id ascending as canonical tiebreak,
-            // matching determine_proposer's logic exactly.
-            let ranked: Vec<(String, u32)> = match igc_for_provider.try_read() {
-                Ok(igc) => {
-                    if let Ok(pou_map) = igc.member_pou_scores.try_read() {
-                        let mut v: Vec<(String, u32)> = pou_map
-                            .iter()
-                            .map(|(id, (score, _))| (id.clone(), *score))
-                            .collect();
-                        v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                        v
-                    } else {
-                        Vec::new()
-                    }
-                }
-                Err(_) => Vec::new(),
-            };
+            // A.6b: build ranked_pou using the canonical
+            // LatencyCanonState (Phase 1 V0.2) instead of the
+            // locally-observed member_pou_scores used pre-A.6b.
+            //
+            // Why canonical, not PoU:
+            //   member_pou_scores is computed independently on every
+            //   LN from local heartbeat observations. Two LNs in the
+            //   same group will see different scores for the same
+            //   peer, so pivot_for_cycle(group, cycle, ranked) would
+            //   elect different pivots on different LNs even for
+            //   the same (group, cycle). When P2.6-C.2 Phase B.2
+            //   broadcasts Block from the pivot, that divergence
+            //   would fork the per-group chain. LatencyCanonState,
+            //   by contrast, is rebuilt against current_wall_clock_bucket
+            //   (see intra_group/mod.rs) so all LNs that have
+            //   ingested the same reports produce byte-identical
+            //   tables — pivot election becomes cluster-deterministic.
+            //
+            //   PoU is NOT removed from the system: it still drives
+            //   V0.1 BFT election, rewards, member ranking, etc.
+            //   This change only swaps the score source for Lattice
+            //   pivot election, where determinism dominates over
+            //   locally-observed quality.
+            //
+            // Cold-start: if g.members is empty (MN GroupAnnouncement
+            // not yet propagated) we return None so the publisher
+            // skips this tick. That is safer than falling back to
+            // member_pou_scores because the fallback would reintroduce
+            // non-determinism precisely during the window the cluster
+            // is most likely to disagree. The publisher resumes as
+            // soon as g.members populates (a few seconds post-boot).
+            //
+            // lookup_score returns 1000 (neutral) for peers without a
+            // canonical bucket yet, so during the bootstrap window
+            // all members tie on score and the canonical secondary
+            // ordering (peer_id ascending, same as determine_proposer)
+            // takes over deterministically.
+            if g.members.is_empty() {
+                return None;
+            }
+            let mut ranked: Vec<(String, u32)> = g
+                .members
+                .iter()
+                .map(|m| {
+                    let score = lcs_for_provider.lookup_score(&g.group_id, m) as u32;
+                    (m.clone(), score)
+                })
+                .collect();
+            ranked.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
             Some((g.group_id, ranked))
         });
     }
