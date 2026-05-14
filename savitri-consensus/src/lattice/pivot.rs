@@ -23,7 +23,7 @@
 //! ## Savitri-specific deviations
 //!
 //! 1. **VRF substituted by blake3-seeded Fisher-Yates shuffle**: deterministic
-//!    given `(group_id, cycle_index/PIVOT_TENURE_SLOTS)` seed. Trade-off:
+//!    given `(group_id, cycle_index/ranked.len())` seed. Trade-off:
 //!    no per-slot unpredictability that VRF gives, but full
 //!    cluster-wide convergence without a distributed randomness beacon.
 //! 2. **PoU score in place of stake**: Savitri's 5-component reputation
@@ -61,16 +61,6 @@
 
 use crate::types::lattice::CycleIndex;
 
-/// Number of cycle slots in one schedule rotation. Matches
-/// `PROPOSER_TENURE_BLOCKS` in the lightnode (currently 10).
-///
-/// Re-defined here as a constant rather than imported from the
-/// lightnode to keep the consensus crate's dependency surface clean.
-/// If the lightnode value changes, this constant MUST be updated in
-/// lockstep — otherwise pivot election diverges between LN and the
-/// commit walker.
-pub const PIVOT_TENURE_SLOTS: usize = 10;
-
 /// Elect the pivot for cycle `k` in group `group_id`.
 ///
 /// The `ranked_pou` slice contains `(peer_id, pou_score)` pairs already
@@ -97,26 +87,43 @@ pub fn pivot_for_cycle(
         return None;
     }
     let schedule = build_weighted_pivot_schedule(ranked_pou, cycle_index, group_id);
-    let slot = (cycle_index as usize) % PIVOT_TENURE_SLOTS;
+    // A.7: rotate every cycle by indexing into a schedule whose
+    // length matches the number of ranked candidates. ranked_pou is
+    // already verified non-empty above, so the modulo is safe.
+    let slot = (cycle_index as usize) % ranked_pou.len();
     schedule.get(slot).cloned()
 }
 
 /// Build a deterministic weighted round-robin schedule of length
-/// `PIVOT_TENURE_SLOTS`, with each peer occupying a number of slots
+/// `ranked.len()`, with each peer occupying a number of slots
 /// proportional to their PoU score, then deterministically shuffled.
 ///
 /// Mirrors the lightnode's `build_weighted_proposer_schedule` — see
 /// the lightnode source for the original rationale comments. The
 /// schedule changes deterministically at every
-/// `cycle_index / PIVOT_TENURE_SLOTS` boundary (a "tenure window"),
-/// so consecutive cycles within the same window share a stable
-/// rotation while still scheduling all eligible peers.
+/// `cycle_index / ranked.len()` boundary (a "tenure window"), so
+/// consecutive cycles within the same window share a stable
+/// rotation while still scheduling all eligible peers. With
+/// `ranked.len() == N`, the pivot rotates every cycle within a
+/// tenure window of N consecutive cycles.
+///
+/// A.7: pre-A.7 this used a global `PIVOT_TENURE_SLOTS` constant.
+/// When that constant was pinned at 1 in an earlier iteration, the
+/// proportional-allocation loop floored every per-peer slot to 0
+/// except the last peer, collapsing the schedule to a single fixed
+/// pivot and disabling rotation entirely. Sizing the schedule to
+/// `ranked.len()` makes every peer get at least one slot when
+/// scores tie (canonical bootstrap), and a proportional number of
+/// slots when scores differ.
 fn build_weighted_pivot_schedule(
     ranked: &[(String, u32)],
     cycle_index: CycleIndex,
     group_id: &str,
 ) -> Vec<String> {
-    let n_slots = PIVOT_TENURE_SLOTS;
+    let n_slots = ranked.len();
+    if n_slots == 0 {
+        return Vec::new();
+    }
     let total: u64 = ranked
         .iter()
         .map(|(_, s)| (*s as u64).max(1))
@@ -144,7 +151,7 @@ fn build_weighted_pivot_schedule(
     // xorshift64). Seed = `(group_id, cycle_index / N)` so the
     // shuffle is stable across all cycles in a tenure window and
     // changes only at boundaries.
-    let tenure_window = cycle_index / PIVOT_TENURE_SLOTS as u64;
+    let tenure_window = cycle_index / n_slots as u64;
     let seed_input = format!("savitri-lattice-pivot-v1|{}|{}", group_id, tenure_window);
     let seed_hash = blake3::hash(seed_input.as_bytes());
     let seed_bytes = seed_hash.as_bytes();
