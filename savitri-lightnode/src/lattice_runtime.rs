@@ -241,6 +241,115 @@ pub struct CommittedLatticeBlock {
     pub merged_tx_bytes: Vec<Vec<u8>>,
 }
 
+/// P2.6-C.2 Phase B.2: per-group topic suffix for the shadow Lattice
+/// block stream. Distinct from V0.1 `/savitri/block/1` to avoid
+/// collisions with the legacy chain consumer.
+pub const LATTICE_BLOCK_TOPIC_SUFFIX: &str = "/lattice/block/1";
+
+/// P2.6-C.2 Phase B.2: env var that turns ON the opt-in gossipsub
+/// broadcast of constructed LatticeBlocks. When unset (default) the
+/// chain consumer still BUILDS the block + emits
+/// DIAG[lattice-block-construct], but does NOT publish it on the
+/// network. This keeps production-like observation runs free of
+/// chain-format gossip noise until the flag-day cutover (B.3).
+pub const LATTICE_BLOCK_BROADCAST_ENV: &str = "SAVITRI_LATTICE_BLOCK_BROADCAST";
+
+#[inline]
+pub fn is_lattice_block_broadcast_enabled() -> bool {
+    std::env::var(LATTICE_BLOCK_BROADCAST_ENV)
+        .map(|v| matches!(v.trim(), "1" | "true" | "TRUE" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+/// Build the per-group lattice-block topic. Mirrors the pattern used
+/// by `cell_topic_for_group` and `batch_topic_for_group`.
+pub fn lattice_block_topic_for_group(group_id: &str) -> libp2p::gossipsub::IdentTopic {
+    libp2p::gossipsub::IdentTopic::new(format!(
+        "/savitri/group/{}{}",
+        group_id, LATTICE_BLOCK_TOPIC_SUFFIX
+    ))
+}
+
+/// P2.6-C.2 Phase B.2: real LatticeBlock produced from a committed
+/// cycle. Independent wire type from V0.1 `Block` -- this is the
+/// V0.2-native block format the post-flag-day chain consumer will
+/// adopt. Shadow-only in Phase B.2 (no chain touch, no persistence).
+///
+/// Hash chain: `parent_block_hash` is the hash of the previous
+/// LatticeBlock for the same group (genesis is `[0; 32]`). The
+/// per-group chain tracking lives in
+/// `LatticeRuntimeState.last_committed_block_hash`.
+///
+/// Determinism contract: two LNs in the same group that commit the
+/// same cycle observe IDENTICAL canonical input
+/// (CommittedLatticeBlock.committed_cells + merged_tx_bytes) and so
+/// produce identical LatticeBlock + identical block_hash. Cluster
+/// agreement on block_hash is the prerequisite for the flag-day
+/// cutover (Phase B.3): every co-grouped LN must converge to the
+/// same chain hash sequence.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct LatticeBlock {
+    /// Cycle index this block corresponds to (1:1 with
+    /// CommittedLatticeBlock.cycle_index).
+    pub cycle_index: CycleIndex,
+    /// Group this block belongs to. Each group has its own
+    /// independent chain.
+    pub group_id: String,
+    /// Hash of the previous LatticeBlock in this group's chain.
+    /// `[0u8; 32]` for the first block (genesis).
+    pub parent_block_hash: [u8; 32],
+    /// Elected pivot for this cycle (proposer in V0.1 semantics).
+    /// Matches CommittedLatticeBlock.pivot byte-for-byte.
+    pub pivot: String,
+    /// Commit timestamp in Unix milliseconds.
+    pub timestamp_ms: u64,
+    /// Number of transactions in this block.
+    pub tx_count: u32,
+    /// Flat SHA-256 over the concatenation of per-tx SHA-256
+    /// digests of the raw signed bytes. Cluster-deterministic
+    /// given the same merged_tx_bytes input.
+    pub tx_root: [u8; 32],
+    /// Raw signed TX bytes in canonical commit order -- same
+    /// encoding as CommittedLatticeBlock.merged_tx_bytes.
+    pub signed_tx_bytes: Vec<Vec<u8>>,
+}
+
+impl LatticeBlock {
+    /// Canonical signable byte encoding. Domain-separated with a
+    /// version-tagged prefix so a future v2 wire format can coexist
+    /// with this one without hash collisions.
+    pub fn signable_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(
+            64 + 8 + self.group_id.len() + 32 + self.pivot.len() + 8 + 4 + 32
+                + self.signed_tx_bytes.iter().map(|b| b.len() + 4).sum::<usize>(),
+        );
+        out.extend_from_slice(b"savitri-lattice-block-v1");
+        out.extend_from_slice(&self.cycle_index.to_le_bytes());
+        out.extend_from_slice(&(self.group_id.len() as u32).to_le_bytes());
+        out.extend_from_slice(self.group_id.as_bytes());
+        out.extend_from_slice(&self.parent_block_hash);
+        out.extend_from_slice(&(self.pivot.len() as u32).to_le_bytes());
+        out.extend_from_slice(self.pivot.as_bytes());
+        out.extend_from_slice(&self.timestamp_ms.to_le_bytes());
+        out.extend_from_slice(&self.tx_count.to_le_bytes());
+        out.extend_from_slice(&self.tx_root);
+        for tx in &self.signed_tx_bytes {
+            out.extend_from_slice(&(tx.len() as u32).to_le_bytes());
+            out.extend_from_slice(tx);
+        }
+        out
+    }
+
+    /// SHA-256 hash over signable_bytes. 32 bytes.
+    pub fn hash(&self) -> [u8; 32] {
+        use sha2::Digest;
+        let digest = sha2::Sha256::digest(self.signable_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(&digest);
+        out
+    }
+}
+
 /// Wire-format envelope for an attestation gossipsub message. We need
 /// to carry both the `cell_id` (so the receiver can look up the cell)
 /// and the `CellAttestation` itself (with signer pubkey + signature).
@@ -291,6 +400,13 @@ pub struct LatticeRuntimeState {
     /// state-machine consumption. None disables the forward (the
     /// default in observation-only mode).
     pub chain_sink: Option<mpsc::Sender<CommittedLatticeBlock>>,
+    /// P2.6-C.2 Phase B.2: per-group LatticeBlock hash chain head.
+    /// Each commit looks up the prior hash for its group, builds a
+    /// LatticeBlock with that as parent_block_hash, computes the
+    /// new block_hash, and writes it back. Initialised lazily --
+    /// the first commit for a group sees `[0; 32]` (genesis).
+    pub last_committed_block_hash:
+        Arc<RwLock<std::collections::HashMap<String, [u8; 32]>>>,
 }
 
 /// Configuration knobs for the runtime tasks. Defaults are tuned for
@@ -386,6 +502,9 @@ impl LatticeRuntime {
             // P2.6-C.1: chain sink remains None until the chain
             // integration wires it in P2.6-C.2.
             chain_sink: None,
+            last_committed_block_hash: Arc::new(RwLock::new(
+                std::collections::HashMap::new(),
+            )),
         });
         Self { state, config }
     }
@@ -1171,6 +1290,20 @@ async fn publish_attestation(state: &LatticeRuntimeState, cell_id: CellId, cell:
     let _ = state.network_publish_tx.send((topic, encoded)).await;
 }
 
+
+/// Helper: short hex for log lines. Returns the first 8 hex chars
+/// of the input slice (16 bits worth) -- enough to disambiguate
+/// hashes in operator logs without dragging full 64-char digests
+/// into every DIAG line.
+fn hex_short(bytes: &[u8]) -> String {
+    let n = bytes.len().min(4);
+    let mut s = String::with_capacity(n * 2);
+    for b in &bytes[..n] {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
 /// Compute the current lattice round from the wall clock.
 /// `unix_secs / LATTICE_ROUND_DURATION_SECS`. All cluster members at
 /// any given wall-clock tick share the same index.
@@ -1271,6 +1404,7 @@ fn compute_batch_root_from_txs(
 /// by audit I/O.
 pub async fn lattice_chain_consumer_loop(
     mut rx: tokio::sync::mpsc::Receiver<CommittedLatticeBlock>,
+    state: Arc<LatticeRuntimeState>,
 ) {
     use tokio::io::AsyncWriteExt;
 
@@ -1359,6 +1493,94 @@ pub async fn lattice_chain_consumer_loop(
                 deser_err,
                 "P2.6-C.2 Phase B.1 shadow block deserialization preview"
             );
+        }
+
+        // P2.6-C.2 Phase B.2: build a real LatticeBlock for this
+        // committed cycle. The block is shadow-only -- no V0.1 chain
+        // touch, no persistence -- but it has a real
+        // parent-block-hash chain (per-group), a real signable byte
+        // encoding, a real block hash, and an opt-in gossipsub
+        // broadcast for cluster-wide hash convergence observation.
+        let parent_block_hash = {
+            let m = state.last_committed_block_hash.read().await;
+            m.get(&block.group_id).copied().unwrap_or([0u8; 32])
+        };
+        // tx_root: flat SHA-256 over the concatenation of per-tx
+        // SHA-256 digests of the raw signed bytes. Deterministic
+        // given the same merged_tx_bytes content.
+        let tx_root = {
+            use sha2::Digest;
+            let mut h = sha2::Sha256::new();
+            for raw in &block.merged_tx_bytes {
+                let tx_digest = sha2::Sha256::digest(raw);
+                h.update(tx_digest);
+            }
+            let digest = h.finalize();
+            let mut out = [0u8; 32];
+            out.copy_from_slice(&digest);
+            out
+        };
+        let lattice_block = LatticeBlock {
+            cycle_index: block.cycle_index,
+            group_id: block.group_id.clone(),
+            parent_block_hash,
+            pivot: block.pivot.clone(),
+            timestamp_ms: ts_ms,
+            tx_count: block.merged_tx_bytes.len() as u32,
+            tx_root,
+            signed_tx_bytes: block.merged_tx_bytes.clone(),
+        };
+        let block_hash = lattice_block.hash();
+        {
+            let mut m = state.last_committed_block_hash.write().await;
+            m.insert(block.group_id.clone(), block_hash);
+        }
+        info!(
+            target: "savitri::lattice",
+            cycle = block.cycle_index,
+            group = %block.group_id,
+            tx_count = lattice_block.tx_count,
+            parent = %hex_short(&parent_block_hash),
+            hash = %hex_short(&block_hash),
+            "DIAG[lattice-block-construct]"
+        );
+
+        // Opt-in broadcast. Gated by SAVITRI_LATTICE_BLOCK_BROADCAST
+        // so production-like observation runs stay quiet on the
+        // gossip mesh; flipping the flag turns this into a live
+        // hash-convergence probe across co-grouped LNs.
+        if is_lattice_block_broadcast_enabled() {
+            match bincode::serialize(&lattice_block) {
+                Ok(buf) => {
+                    let topic = lattice_block_topic_for_group(&block.group_id);
+                    if state
+                        .network_publish_tx
+                        .send((topic, buf))
+                        .await
+                        .is_err()
+                    {
+                        debug!(
+                            target: "savitri::lattice",
+                            "consumer: lattice-block publish channel closed, skipping"
+                        );
+                    } else {
+                        info!(
+                            target: "savitri::lattice",
+                            cycle = block.cycle_index,
+                            group = %block.group_id,
+                            hash = %hex_short(&block_hash),
+                            "DIAG[lattice-block-broadcast] published on gossip"
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        target: "savitri::lattice",
+                        error = %e,
+                        "consumer: LatticeBlock bincode encode failed"
+                    );
+                }
+            }
         }
 
         if total_blocks % 50 == 0 {

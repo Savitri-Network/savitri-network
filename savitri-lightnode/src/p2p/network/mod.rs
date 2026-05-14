@@ -553,7 +553,10 @@ pub async fn start_network(
             "P2.6-C.2: set_chain_sink failed (Arc already cloned) - shadow consumer will not receive blocks"
         );
     }
-    tokio::spawn(crate::lattice_runtime::lattice_chain_consumer_loop(chain_sink_rx));
+    tokio::spawn(crate::lattice_runtime::lattice_chain_consumer_loop(
+        chain_sink_rx,
+        lattice_runtime.state(),
+    ));
 
     let lattice_runtime_state = lattice_runtime.state();
     {
