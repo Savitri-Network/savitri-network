@@ -810,10 +810,16 @@ where
 
     loop {
         tick.tick().await;
-        let Some((group_id, _ranked_pou)) = group_provider() else {
+        let Some((group_id, ranked_pou)) = group_provider() else {
             debug!(target: "savitri::lattice", "publisher: no current group, skipping");
             continue;
         };
+        // Issue #13: Sync aggregator group_size with the current group
+        // composition so the quorum threshold is correct after rotation.
+        {
+            let mut agg = state.aggregator.write().await;
+            agg.set_group_size(ranked_pou.len());
+        }
 
         // Determine our author round = the current lattice round.
         // Phase 2 uses chain-independent timing: round = unix_secs /
@@ -1008,6 +1014,13 @@ async fn commit_poller_loop<F>(
         let Some((group_id, ranked_pou)) = group_provider() else {
             continue;
         };
+        // Issue #13: Sync aggregator group_size with the current group
+        // composition. Both loops update it so rotation is picked up in
+        // ≤ min(publisher_interval, commit_interval) seconds.
+        {
+            let mut agg = state.aggregator.write().await;
+            agg.set_group_size(ranked_pou.len());
+        }
 
         // Compute the current cycle from the wall-clock-derived
         // lattice round. cycle = round / 2.
