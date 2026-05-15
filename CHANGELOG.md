@@ -12,6 +12,18 @@ Lattice design overview: see [`docs/CONSENSUS_V0.2_DESIGN.md`](docs/CONSENSUS_V0
 
 ## [Unreleased]
 
+### Added
+
+- feat(lightnode): `LatticeBlock` construction — for every committed `Cycle`,
+  builds a `LatticeBlock` with `cycle_index`, `group_id`, SHA-256
+  `parent_block_hash` chain, deterministic `tx_root` (Merkle-flat SHA-256),
+  `pivot`, `timestamp_ms`, and `signed_tx_bytes`; `hash()` domain-separated with
+  `"savitri-lattice-block-v1"`. Per-group parent-hash chain starts at `[0; 32]`
+  (genesis) and chains deterministically across cycles. Opt-in gossipsub
+  broadcast on `/savitri/group/<gid>/lattice/block/1` gated by
+  `SAVITRI_LATTICE_BLOCK_BROADCAST` env var (default OFF).
+  Shadow-only — V0.1 BFT chain is unaffected. (P2.6-C.2 Phase B.2, commit `10a5a30`)
+
 ### In progress
 
 - Phase 2.5 self-attestation fix validation cluster-wide (113 cert events
