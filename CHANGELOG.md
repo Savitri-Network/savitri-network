@@ -14,6 +14,13 @@ Lattice design overview: see [`docs/CONSENSUS_V0.2_DESIGN.md`](docs/CONSENSUS_V0
 
 ### Added
 
+- feat(lightnode, storage): per-group `LatticeBlock` chain head persistence to
+  RocksDB — new `CF_LATTICE_CHAIN_HEAD` column family stores the 32-byte
+  `last_committed_block_hash` per group. Boot path reads all persisted heads back
+  into the runtime before the consumer loop starts, so the shadow chain does not
+  fork at restart. In-memory backend provides functional no-ops; only the RocksDB
+  backend persists. Idempotent: older DBs auto-add the column family on first open
+  after binary rollout. (P2.6-D.1, commit `a01df6e`)
 - feat(lightnode): `LatticeBlock` construction — for every committed `Cycle`,
   builds a `LatticeBlock` with `cycle_index`, `group_id`, SHA-256
   `parent_block_hash` chain, deterministic `tx_root` (Merkle-flat SHA-256),

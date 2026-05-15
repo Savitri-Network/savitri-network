@@ -553,9 +553,39 @@ pub async fn start_network(
             "P2.6-C.2: set_chain_sink failed (Arc already cloned) - shadow consumer will not receive blocks"
         );
     }
+    // P2.6-D.1: restore the per-group chain head from RocksDB
+    // BEFORE spawning the consumer so the very first commit after
+    // boot already sees the correct parent_block_hash for its
+    // group. Empty result is the normal cold-start case.
+    match storage.list_lattice_chain_heads() {
+        Ok(heads) => {
+            if !heads.is_empty() {
+                let runtime_state = lattice_runtime.state();
+                let mut map = runtime_state.last_committed_block_hash.write().await;
+                for (group_id, hash) in &heads {
+                    map.insert(group_id.clone(), *hash);
+                }
+                drop(map);
+                tracing::info!(
+                    target: "savitri::lattice",
+                    restored = heads.len(),
+                    "DIAG[lattice-block-restore] per-group chain heads restored from RocksDB"
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                target: "savitri::lattice",
+                error = %e,
+                "DIAG[lattice-block-restore] list_lattice_chain_heads failed; consumer will start at genesis"
+            );
+        }
+    }
+
     tokio::spawn(crate::lattice_runtime::lattice_chain_consumer_loop(
         chain_sink_rx,
         lattice_runtime.state(),
+        storage.clone(),
     ));
 
     let lattice_runtime_state = lattice_runtime.state();

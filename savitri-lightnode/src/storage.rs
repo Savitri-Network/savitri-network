@@ -97,7 +97,28 @@ pub trait BlockAndAccountStorage: Send + Sync {
         Ok(0)
     }
 
-    /// SECURITY (AUDIT-029): Atomically commit all block data in a single batch.
+    /// P2.6-D.1: persist a per-group LatticeBlock chain head.
+    /// Stores raw 32-byte block_hash under raw group_id bytes in
+    /// the dedicated `lattice_chain_head` column family.
+    fn set_lattice_chain_head(
+        &self,
+        group_id: &str,
+        block_hash: &[u8; 32],
+    ) -> Result<()>;
+
+    /// P2.6-D.1: read back a per-group chain head, if any.
+    /// Returns None when the group has no head yet (genesis) OR
+    /// when the underlying storage does not support persistence
+    /// (mock/memory-only impl).
+    fn get_lattice_chain_head(&self, group_id: &str) -> Result<Option<[u8; 32]>>;
+
+    /// P2.6-D.1: iterate every persisted (group_id, chain_head)
+    /// pair. Used by the runtime at boot to restore the in-memory
+    /// `last_committed_block_hash` map. Order is implementation-defined
+    /// (RocksDB returns lex order on the key bytes).
+    fn list_lattice_chain_heads(&self) -> Result<Vec<(String, [u8; 32])>>;
+
+        /// SECURITY (AUDIT-029): Atomically commit all block data in a single batch.
     ///
     /// Default implementation falls back to sequential writes (chain head last).
     /// RocksDB-backed implementations override this to use WriteBatch for true atomicity.
@@ -310,6 +331,26 @@ impl BlockAndAccountStorage for Storage {
             blocks.remove(&h);
         }
         Ok(count)
+    }
+
+    fn set_lattice_chain_head(
+        &self,
+        _group_id: &str,
+        _block_hash: &[u8; 32],
+    ) -> Result<()> {
+        // In-memory backend has no persistence — drop silently. The
+        // runtime stays correct because the in-memory map already
+        // holds the chain head; loss on restart is the same fate
+        // as the rest of the in-memory state.
+        Ok(())
+    }
+
+    fn get_lattice_chain_head(&self, _group_id: &str) -> Result<Option<[u8; 32]>> {
+        Ok(None)
+    }
+
+    fn list_lattice_chain_heads(&self) -> Result<Vec<(String, [u8; 32])>> {
+        Ok(Vec::new())
     }
 }
 
@@ -1324,6 +1365,58 @@ impl BlockAndAccountStorage for RocksDBLightnodeStorage {
 
         // Atomic commit — all-or-nothing
         batch.commit()
+    }
+
+    fn set_lattice_chain_head(
+        &self,
+        group_id: &str,
+        block_hash: &[u8; 32],
+    ) -> Result<()> {
+        use savitri_storage::storage::CF_LATTICE_CHAIN_HEAD;
+        self.inner
+            .put_cf(CF_LATTICE_CHAIN_HEAD, group_id.as_bytes(), block_hash)
+            .map_err(|e| anyhow::anyhow!("set_lattice_chain_head: {}", e))
+    }
+
+    fn get_lattice_chain_head(&self, group_id: &str) -> Result<Option<[u8; 32]>> {
+        use savitri_storage::storage::CF_LATTICE_CHAIN_HEAD;
+        let raw = self
+            .inner
+            .get_cf(CF_LATTICE_CHAIN_HEAD, group_id.as_bytes())
+            .map_err(|e| anyhow::anyhow!("get_lattice_chain_head: {}", e))?;
+        Ok(raw.and_then(|v| {
+            if v.len() == 32 {
+                let mut out = [0u8; 32];
+                out.copy_from_slice(&v);
+                Some(out)
+            } else {
+                None
+            }
+        }))
+    }
+
+    fn list_lattice_chain_heads(&self) -> Result<Vec<(String, [u8; 32])>> {
+        use savitri_storage::storage::CF_LATTICE_CHAIN_HEAD;
+        let iter = self
+            .inner
+            .iterator_cf(CF_LATTICE_CHAIN_HEAD)
+            .map_err(|e| anyhow::anyhow!("list_lattice_chain_heads iter open: {}", e))?;
+        let mut out: Vec<(String, [u8; 32])> = Vec::new();
+        for item in iter {
+            let (k, v) = item
+                .map_err(|e| anyhow::anyhow!("list_lattice_chain_heads iter item: {}", e))?;
+            if v.len() != 32 {
+                continue;
+            }
+            let group_id = match String::from_utf8(k) {
+                Ok(g) => g,
+                Err(_) => continue,
+            };
+            let mut h = [0u8; 32];
+            h.copy_from_slice(&v);
+            out.push((group_id, h));
+        }
+        Ok(out)
     }
 }
 

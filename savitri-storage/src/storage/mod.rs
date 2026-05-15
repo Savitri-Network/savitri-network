@@ -163,6 +163,12 @@ use std::sync::RwLock;
 /// Column family names for blockchain data organization
 pub const CF_DEFAULT: &str = "default";
 pub const CF_BLOCKS: &str = "blocks";
+/// P2.6-D.1: per-group LatticeBlock chain head persistence. Key =
+/// raw group_id bytes; value = the 32-byte block_hash of the most
+/// recently committed LatticeBlock for that group. Survives LN
+/// restart so the shadow chain does not reset to genesis on every
+/// reboot.
+pub const CF_LATTICE_CHAIN_HEAD: &str = "lattice_chain_head";
 pub const CF_TRANSACTIONS: &str = "transactions";
 pub const CF_STATE: &str = "state";
 pub const CF_METADATA: &str = "metadata";
@@ -320,6 +326,8 @@ impl Storage {
                 contracts::CF_CONTRACTS,
                 contracts::CF_CONTRACT_STORAGE,
                 contracts::CF_CONTRACT_CODE,
+                // P2.6-D.1
+                CF_LATTICE_CHAIN_HEAD,
             ];
 
             let mut column_families: Vec<String> = match DB::list_cf(&opts, &config.path) {
@@ -1296,6 +1304,8 @@ impl Storage {
             contracts::CF_CONTRACTS,
             contracts::CF_CONTRACT_STORAGE,
             contracts::CF_CONTRACT_CODE,
+            // P2.6-D.1
+            CF_LATTICE_CHAIN_HEAD,
         ];
 
         if known_cfs.contains(&cf_name) {
