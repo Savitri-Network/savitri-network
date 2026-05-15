@@ -12,6 +12,34 @@ Lattice design overview: see [`docs/CONSENSUS_V0.2_DESIGN.md`](docs/CONSENSUS_V0
 
 ## [Unreleased]
 
+### Added
+
+- feat(lightnode): `LatticeRuntime` wired end-to-end into the gossip event loop
+  (V0.2 Phase 2.4.3) — subscribes to
+  `/savitri/group/<gid>/lattice/{cell,attestation}/1` on each group rotation;
+  unsubscribes stale topics; dispatches messages into `LatticeRuntime`; constructs
+  runtime and spawns background tasks on node start. V0.1 BFT path is unaffected:
+  `is_authoritative_mode()` returns `false` by default so the runtime runs in
+  observation-only mode until `SAVITRI_CONSENSUS_VERSION=v2` is set.
+  (Closes #10)
+
+### Fixed
+
+- fix(consensus): pivot schedule length now equals group size (`ranked_pou.len()`)
+  instead of hardcoded `PIVOT_TENURE_SLOTS=10`; fixes skewed leader rotation for
+  groups with fewer than 10 members — for example a 5-member group previously
+  gave 2 slots to the top-scoring peer instead of 1.
+  New unit tests: `pivot_covers_all_members_equal_scores`,
+  `schedule_length_equals_group_size` (sizes 3/5/7/10/12), `pivot_is_deterministic`.
+  (Closes #11)
+- fix(masternode): proposer whitelist ACK TTL reduced from 86 400 s → 120 s to
+  prevent gossipsub send-queue saturation under lattice attestation load.
+- fix(mempool): remove duplicate `pub mod nonce_limits` declaration (pre-existing
+  E0428 compile error).
+- fix(lightnode): gate `integration_test`, `mobile_setup`, `desktop_lightnode`
+  examples behind `required-features = ["integration_tests"]` so `cargo test` and
+  `cargo build --examples` do not fail on legacy API surfaces.
+
 ### In progress
 
 - Phase 2.5 self-attestation fix validation cluster-wide (113 cert events
