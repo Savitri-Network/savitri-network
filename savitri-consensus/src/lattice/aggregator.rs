@@ -121,6 +121,12 @@ pub enum AggregatorError {
     UnknownCell(String),
     #[error("attestation cap reached for cell — dropping")]
     AttestationCapReached,
+    /// Bullshark anti-stall rule: round > 0 cells must reference at least
+    /// 2f+1 certified parents from the previous round. A cell with fewer
+    /// parents would disconnect the DAG and silently drop causal history
+    /// during `walk_causal_history`. (issue #14)
+    #[error("cell has {got} parents but Bullshark requires ≥ {required} (2f+1)")]
+    InsufficientParents { got: usize, required: usize },
 }
 
 /// What [`LatticeAggregator::observe_attestation`] returns to the caller.
@@ -214,6 +220,21 @@ impl LatticeAggregator {
     pub fn observe_cell(&mut self, cell: LatticeCell) -> Result<CellId, AggregatorError> {
         if !cell.verify_author_signature() {
             return Err(AggregatorError::BadCellSignature);
+        }
+        // Issue #14: Enforce Bullshark parent quorum (2f+1) for rounds > 0.
+        // Round-0 cells are genesis — no prior certified round exists.
+        // For all later rounds the anti-stall rule requires at least 2f+1
+        // certified parents; cells with fewer parents would create a
+        // disconnected DAG vertex that walk_causal_history silently skips,
+        // dropping all enclosed transactions.
+        if cell.round > 0 {
+            let required = lattice_quorum(self.config.group_size);
+            if cell.parents.len() < required {
+                return Err(AggregatorError::InsufficientParents {
+                    got: cell.parents.len(),
+                    required,
+                });
+            }
         }
         let cell_id = cell.cell_id();
         if self.high_water_round < cell.round {
@@ -398,4 +419,98 @@ fn verify_attestation_against_cell(att: &CellAttestation, cell: &LatticeCell) ->
     };
     let sig = Signature::from_bytes(&att.signature);
     key.verify(&cell.signable_bytes(), &sig).is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::lattice::{lattice_quorum, LatticeCell};
+
+    /// Build a signed `LatticeCell` for testing.
+    fn make_signed_cell(
+        round: u64,
+        parents: Vec<[u8; 32]>,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> LatticeCell {
+        use ed25519_dalek::Signer;
+        let author_pubkey = signing_key.verifying_key().to_bytes();
+        let mut cell = LatticeCell::with_sorted_parents(
+            round,
+            "group_test".to_string(),
+            "peer_test".to_string(),
+            author_pubkey,
+            parents,
+            [0u8; 32],
+            [0u8; 64],
+        );
+        let payload = cell.signable_bytes();
+        cell.author_signature = signing_key.sign(&payload).to_bytes();
+        cell
+    }
+
+    // ── Issue #13: set_group_size updates quorum threshold ────────────────
+
+    #[test]
+    fn test_set_group_size_updates_quorum() {
+        let mut agg = LatticeAggregator::new(AggregatorConfig {
+            group_size: 5,
+            ..Default::default()
+        });
+        assert_eq!(agg.quorum(), lattice_quorum(5));
+        agg.set_group_size(7);
+        assert_eq!(agg.quorum(), lattice_quorum(7));
+        assert_eq!(agg.quorum(), 5);
+    }
+
+    // ── Issue #14: Bullshark parent quorum enforced in observe_cell ───────
+
+    #[test]
+    fn test_round_zero_genesis_no_parents_accepted() {
+        let mut agg = LatticeAggregator::new(AggregatorConfig::default());
+        let sk = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
+        let cell = make_signed_cell(0, vec![], &sk);
+        assert!(
+            agg.observe_cell(cell).is_ok(),
+            "round-0 cell with no parents must be accepted"
+        );
+    }
+
+    #[test]
+    fn test_round_one_no_parents_rejected_with_insufficient_parents() {
+        let mut agg = LatticeAggregator::new(AggregatorConfig {
+            group_size: 5,
+            ..Default::default()
+        });
+        let sk = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
+        let cell = make_signed_cell(1, vec![], &sk);
+        match agg.observe_cell(cell) {
+            Err(AggregatorError::InsufficientParents { got, required }) => {
+                assert_eq!(got, 0);
+                assert_eq!(required, lattice_quorum(5));
+            }
+            other => panic!("expected InsufficientParents, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_round_one_sufficient_parents_accepted() {
+        let mut agg = LatticeAggregator::new(AggregatorConfig {
+            group_size: 5,
+            ..Default::default()
+        });
+        let sk = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
+        let quorum = lattice_quorum(5);
+        let parents: Vec<[u8; 32]> = (0..quorum)
+            .map(|i| {
+                let mut id = [0u8; 32];
+                id[0] = i as u8;
+                id
+            })
+            .collect();
+        let cell = make_signed_cell(1, parents, &sk);
+        assert!(
+            agg.observe_cell(cell).is_ok(),
+            "round-1 cell with 2f+1 parents must be accepted"
+        );
+    }
 }

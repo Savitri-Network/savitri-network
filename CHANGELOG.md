@@ -39,6 +39,15 @@ Lattice design overview: see [`docs/CONSENSUS_V0.2_DESIGN.md`](docs/CONSENSUS_V0
   `latency_canon_publisher` task; `lookup_score` returns neutral 1000 during
   bootstrap window. `LatencyCanonState` exposed via `NetworkComponents`.
   (P2.6 A.6b, commit `cea3dc3`)
+- feat(consensus, lightnode): sync `LatticeAggregator` `group_size` on every
+  group rotation — `publisher_loop` and `commit_poller_loop` call
+  `aggregator.set_group_size(ranked_pou.len())` each tick so `lattice_quorum`
+  = `2f+1` tracks the actual group composition. (P2.6, commit `8067a4d`)
+- feat(consensus): enforce Bullshark parent quorum (`2f+1`) in
+  `LatticeAggregator::observe_cell()` — round > 0 cells with fewer than
+  `lattice_quorum(group_size)` parents are rejected with new
+  `AggregatorError::InsufficientParents`; round-0 genesis cells are exempt;
+  3 unit tests added. (P2.6, commit `8067a4d`)
 
 ### In progress
 
