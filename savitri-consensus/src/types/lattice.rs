@@ -283,3 +283,41 @@ pub fn lattice_quorum(group_size: usize) -> usize {
     let f = (group_size - 1) / 3;
     2 * f + 1
 }
+
+// ---------------------------------------------------------------------------
+// Batch root helpers — data-availability layer (Phase 2.6, issue #15)
+// ---------------------------------------------------------------------------
+//
+// The `BatchEnvelope` wire type lives in `savitri_lightnode::lattice_runtime`
+// (where it is gossipped) to keep the on-wire schema co-located with the
+// publish / receive handlers. The functions below provide the canonical
+// batch-root computation used by both the publisher and unit tests that do not
+// have access to the lightnode binary.
+
+/// Domain-separation tag for an empty batch (zero transactions).
+/// `blake3(b"savitri-lattice-empty-batch-v1")` — distinct from a zero array
+/// so an empty batch is not confused with an uninitialised root.
+pub const EMPTY_BATCH_TAG: &[u8] = b"savitri-lattice-empty-batch-v1";
+
+/// Compute a canonical batch root from a slice of raw signed-transaction bytes.
+///
+/// Algorithm (flat Merkle with blake3):
+/// 1. `sig_hash[i] = blake3(signed_tx_bytes[i])`.
+/// 2. Sort ascending so the root is arrival-order-independent.
+/// 3. `root = blake3(concat(sig_hashes))`.
+/// 4. Empty slice: `root = blake3(EMPTY_BATCH_TAG)`.
+pub fn compute_batch_root(signed_tx_bytes: &[Vec<u8>]) -> BatchRoot {
+    if signed_tx_bytes.is_empty() {
+        return *blake3::hash(EMPTY_BATCH_TAG).as_bytes();
+    }
+    let mut sig_hashes: Vec<[u8; 32]> = signed_tx_bytes
+        .iter()
+        .map(|b| *blake3::hash(b).as_bytes())
+        .collect();
+    sig_hashes.sort_unstable();
+    let mut hasher = blake3::Hasher::new();
+    for h in &sig_hashes {
+        hasher.update(h);
+    }
+    *hasher.finalize().as_bytes()
+}
