@@ -23,6 +23,15 @@ Lattice design overview: see [`docs/CONSENSUS_V0.2_DESIGN.md`](docs/CONSENSUS_V0
   broadcast on `/savitri/group/<gid>/lattice/block/1` gated by
   `SAVITRI_LATTICE_BLOCK_BROADCAST` env var (default OFF).
   Shadow-only — V0.1 BFT chain is unaffected. (P2.6-C.2 Phase B.2, commit `10a5a30`)
+- feat(lightnode): wire real PoU scores from `LatencyCanonState` into
+  `LatticeRuntime` `group_provider` — replaces constant-1000 placeholders;
+  subscribes to `/savitri/group/<gid>/latency_canon/1` per group rotation,
+  deserializes + Ed25519-verifies `LatencyReport` gossip messages, ingests into
+  shared `LatencyCanonState`, and rebuilds the canonical latency table per
+  wall-clock bucket at every `group_provider` call; spawns periodic 10 s
+  `latency_canon_publisher` task; `lookup_score` returns neutral 1000 during
+  bootstrap window. `LatencyCanonState` exposed via `NetworkComponents`.
+  (P2.6 A.6b, commit `cea3dc3`)
 
 ### In progress
 
