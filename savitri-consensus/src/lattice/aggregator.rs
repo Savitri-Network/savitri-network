@@ -387,6 +387,13 @@ impl LatticeAggregator {
         self.certified.get(&(round, author.to_string()))
     }
 
+    /// Look up a certified cell by its stable `CellId` (blake3 of signable
+    /// bytes). Uses a linear scan over the certified map — suitable for the
+    /// commit-poller path which processes one cycle per tick.
+    pub fn get_certified_cell(&self, cell_id: &CellId) -> Option<&CellCertificate> {
+        self.certified.values().find(|c| c.cell.cell_id() == *cell_id)
+    }
+
     /// Total certified count. For DIAG / observability.
     #[inline]
     pub fn certified_count(&self) -> usize {

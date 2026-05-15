@@ -48,6 +48,15 @@ Lattice design overview: see [`docs/CONSENSUS_V0.2_DESIGN.md`](docs/CONSENSUS_V0
   `lattice_quorum(group_size)` parents are rejected with new
   `AggregatorError::InsufficientParents`; round-0 genesis cells are exempt;
   3 unit tests added. (P2.6, commit `8067a4d`)
+- feat(lightnode, consensus): real `BatchEnvelope` data-availability layer
+  (issue #15) — removes `placeholder_batch_root()`; publisher peeks up to
+  `TX_PER_CELL_CAP` pending TX via non-destructive `peek_canonical_bytes`,
+  computes domain-separated `batch_root` (`compute_batch_root_v2`), broadcasts
+  `BatchEnvelope` on `/savitri/group/<gid>/lattice/batch/1` before the
+  `LatticeCell`; receiver verifies `batch_root`, caches TX in `batch_cache`;
+  commit poller re-checks roots at commit time and warns on mismatch;
+  `compute_batch_root` helper + `get_certified_cell` added to consensus types;
+  `peek_batch_with_bytes` added to mempool.
 
 ### In progress
 
